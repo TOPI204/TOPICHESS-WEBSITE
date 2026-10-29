@@ -1,0 +1,1079 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101820">
+<title>TOPICHESS — Play Chess</title>
+
+<!-- Chess.js: legal moves, checkmate, castling, en passant and promotion -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+<style>
+:root {
+  --bg: #101820;
+  --panel: #19242d;
+  --panel2: #222f39;
+  --text: #f5f5f5;
+  --muted: #a8b3bc;
+  --gold: #d6b46a;
+  --light: #e9e2d0;
+  --dark: #78917c;
+  --selected: #e8ca61;
+  --last: rgba(245, 211, 91, .42);
+  --legal: rgba(18, 30, 24, .34);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+.app {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.brand {
+  font-size: clamp(23px, 5vw, 34px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  margin: 0;
+}
+
+.brand span { color: var(--gold); }
+
+.subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  margin-top: 3px;
+}
+
+.engine-badge {
+  border: 1px solid #3b4c54;
+  color: var(--gold);
+  padding: 7px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(230px, .8fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.board-panel, .side-panel {
+  background: var(--panel);
+  border: 1px solid #293943;
+  border-radius: 14px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  min-height: 57px;
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--panel2);
+  font-size: 22px;
+}
+
+.player-info { flex: 1; min-width: 0; }
+
+.player-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.player-description {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.clock {
+  font-size: 19px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  background: #0e151b;
+  padding: 7px 11px;
+  border-radius: 7px;
+  min-width: 78px;
+  text-align: center;
+}
+
+.clock.active {
+  background: var(--gold);
+  color: #15191a;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 3px solid #34444a;
+  border-radius: 3px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2",
+    "DejaVu Sans", serif;
+  font-size: clamp(22px, 6.2vw, 57px);
+  line-height: 1;
+  transition: background-color .12s ease;
+}
+
+.square.light { background: var(--light); }
+.square.dark { background: var(--dark); }
+
+.square.last-move::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--last);
+  pointer-events: none;
+}
+
+.square.selected {
+  box-shadow: inset 0 0 0 4px var(--selected);
+}
+
+.piece {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  transition: transform .12s ease;
+  pointer-events: none;
+}
+
+.square:active .piece { transform: scale(.94); }
+
+.white-piece {
+  color: #fffdf5;
+  -webkit-text-stroke: 1px #30363b;
+  text-shadow: 0 1px 1px #343a40, 0 0 2px #343a40;
+}
+
+.black-piece {
+  color: #1a2024;
+  -webkit-text-stroke: .35px #111;
+  text-shadow: 0 1px 1px rgba(255,255,255,.15);
+}
+
+.legal-dot {
+  position: absolute;
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--legal);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.legal-capture {
+  position: absolute;
+  inset: 3px;
+  border: 4px solid rgba(18, 30, 24, .38);
+  border-radius: 50%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.coordinate {
+  position: absolute;
+  z-index: 3;
+  font-size: clamp(8px, 1.5vw, 12px);
+  font-family: system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.coordinate.rank { top: 3px; left: 4px; }
+.coordinate.file { bottom: 3px; right: 4px; }
+
+.light .coordinate { color: #647a67; }
+.dark .coordinate { color: #f1e7cf; }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 2px 5px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+
+.status-dot.thinking {
+  background: #65c7a2;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: .4; }
+  to { opacity: 1; }
+}
+
+.section-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin: 3px 0 13px;
+}
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px 5px;
+  border-radius: 8px;
+  border: 1px solid #34434d;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.mode-btn.active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #171b1d;
+}
+
+.btn-secondary {
+  background: var(--panel2);
+  border: 1px solid #35444e;
+  color: var(--text);
+}
+
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 20px;
+}
+
+.actions .btn { flex: 1; }
+
+.history-box {
+  background: #111a21;
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 125px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr;
+  gap: 6px;
+  padding: 8px 5px;
+  border-bottom: 1px solid #26333b;
+  font-size: 13px;
+}
+
+.history-row:last-child { border-bottom: 0; }
+.move-number { color: var(--muted); }
+.move-san { font-weight: 650; }
+
+.empty-history {
+  padding: 20px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.divider {
+  height: 1px;
+  background: #2b3942;
+  margin: 17px 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+select {
+  color: var(--text);
+  background: var(--panel2);
+  border: 1px solid #394851;
+  border-radius: 7px;
+  padding: 8px;
+  max-width: 145px;
+}
+
+.footer {
+  color: #77848c;
+  font-size: 10px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+@media (min-width: 900px) {
+  .square { font-size: clamp(32px, 5vw, 66px); }
+}
+
+@media (max-width: 650px) {
+  body { padding: 9px; }
+  header { margin-bottom: 10px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .board-panel, .side-panel { padding: 10px; }
+  .board-panel { max-width: 550px; width: 100%; margin: auto; }
+  .side-panel { width: 100%; }
+  .square { font-size: clamp(24px, 10.2vw, 49px); }
+  .clock { font-size: 16px; min-width: 68px; }
+  .engine-badge { font-size: 10px; padding: 6px 8px; }
+  .history-box { max-height: 200px; }
+}
+
+@media (max-width: 360px) {
+  body { padding: 5px; }
+  .brand { letter-spacing: 2px; }
+  .square { font-size: 23px; }
+  .board-panel, .side-panel { padding: 7px; }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <h1 class="brand">TOPI<span>CHESS</span></h1>
+      <div class="subtitle">THINK. PLAY. MASTER.</div>
+    </div>
+    <div class="engine-badge" id="engineBadge">ENGINE LOADING</div>
+  </header>
+
+  <main class="layout">
+    <section class="board-panel">
+      <div class="player">
+        <div class="avatar">♟</div>
+        <div class="player-info">
+          <div class="player-name">Stockfish</div>
+          <div class="player-description">Black · Computer</div>
+        </div>
+        <div class="clock" id="blackClock">10:00</div>
+      </div>
+
+      <div id="board" role="group" aria-label="Chessboard"></div>
+
+      <div class="player">
+        <div class="avatar">♙</div>
+        <div class="player-info">
+          <div class="player-name">You</div>
+          <div class="player-description">White · Player</div>
+        </div>
+        <div class="clock active" id="whiteClock">10:00</div>
+      </div>
+
+      <div class="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText" aria-live="polite">Preparing chessboard...</span>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <div class="section-title">GAME MODE</div>
+
+      <div class="mode-row">
+        <button class="mode-btn active" id="computerMode">vs Computer</button>
+        <button class="mode-btn" id="localMode">2 Players</button>
+      </div>
+
+      <div class="section-title">MOVE HISTORY</div>
+      <div class="history-box" id="history">
+        <div class="empty-history">Your moves will appear here.</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="resetBtn">↻ Reset Game</button>
+        <button class="btn btn-secondary" id="undoBtn">↶ Undo</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section-title">GAME SETTINGS</div>
+
+      <div class="settings-row">
+        <label for="difficulty">AI difficulty</label>
+        <select id="difficulty">
+          <option value="5">Easy · Depth 5</option>
+          <option value="8">Normal · Depth 8</option>
+          <option value="10" selected>Hard · Depth 10</option>
+          <option value="12">Expert · Depth 12</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label for="timeControl">Time control</label>
+        <select id="timeControl">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10" selected>10 minutes</option>
+          <option value="15">15 minutes</option>
+        </select>
+      </div>
+
+      <div class="footer">
+        TOPICHESS · BUILT FOR CHESS LOVERS
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/*
+ * TOPICHESS
+ * Single-file front end.
+ *
+ * External dependencies:
+ * 1. chess.js handles legal chess rules.
+ * 2. Stockfish runs in a browser Web Worker.
+ *
+ * Host on HTTPS (for example, GitHub Pages).
+ */
+
+const STOCKFISH_URL =
+  "https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js";
+
+const $ = id => document.getElementById(id);
+const game = new Chess();
+
+const FILES = "abcdefgh";
+const PIECES = {
+  wk: "♔", wq: "♕", wr: "♖", wb: "♗", wn: "♘", wp: "♙",
+  bk: "♚", bq: "♛", br: "♜", bb: "♝", bn: "♞", bp: "♟"
+};
+
+let selectedSquare = null;
+let legalTargets = [];
+let lastMove = null;
+let stockfish = null;
+let engineReady = false;
+let engineBusy = false;
+let engineFailed = false;
+let mode = "computer";
+let gameOver = false;
+let clockStarted = false;
+let remaining = { w: 600, b: 600 };
+let clockInterval = null;
+let engineRequestId = 0;
+let pendingEngineRequest = null;
+let moveHistory = [];
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function updateClocks() {
+  $("whiteClock").textContent = formatTime(remaining.w);
+  $("blackClock").textContent = formatTime(remaining.b);
+
+  const turn = game.turn();
+  $("whiteClock").classList.toggle("active", !gameOver && turn === "w");
+  $("blackClock").classList.toggle("active", !gameOver && turn === "b");
+}
+
+function startClock() {
+  if (clockStarted) return;
+  clockStarted = true;
+
+  if (clockInterval) clearInterval(clockInterval);
+
+  clockInterval = setInterval(() => {
+    if (gameOver || !clockStarted) return;
+
+    // The clock runs for the side whose turn it is.
+    const side = game.turn();
+    remaining[side] = Math.max(0, remaining[side] - 1);
+    updateClocks();
+
+    if (remaining[side] <= 0) {
+      gameOver = true;
+      clockStarted = false;
+      clearInterval(clockInterval);
+      stopEngineSearch();
+
+      setStatus(
+        side === "w"
+          ? "Time out — Black wins!"
+          : "Time out — White wins!",
+        false
+      );
+    }
+  }, 1000);
+}
+
+function stopClock() {
+  clockStarted = false;
+  if (clockInterval) clearInterval(clockInterval);
+  clockInterval = null;
+}
+
+function setStatus(message, thinking = false) {
+  $("statusText").textContent = message;
+  $("statusDot").classList.toggle("thinking", thinking);
+}
+
+function updateStatus() {
+  if (game.is_checkmate()) {
+    gameOver = true;
+    stopClock();
+    stopEngineSearch();
+    setStatus(
+      game.turn() === "w"
+        ? "Checkmate — Black wins!"
+        : "Checkmate — White wins!"
+    );
+    return;
+  }
+
+  if (game.is_stalemate()) {
+    gameOver = true;
+    stopClock();
+    stopEngineSearch();
+    setStatus("Draw — stalemate.");
+    return;
+  }
+
+  if (game.insufficient_material()) {
+    gameOver = true;
+    stopClock();
+    stopEngineSearch();
+    setStatus("Draw — insufficient material.");
+    return;
+  }
+
+  if (game.in_threefold_repetition()) {
+    gameOver = true;
+    stopClock();
+    stopEngineSearch();
+    setStatus("Draw — threefold repetition.");
+    return;
+  }
+
+  if (game.in_draw()) {
+    gameOver = true;
+    stopClock();
+    stopEngineSearch();
+    setStatus("Draw — game drawn.");
+    return;
+  }
+
+  if (game.in_check()) {
+    setStatus(
+      game.turn() === "w" ? "White is in check!" : "Black is in check!",
+      engineBusy
+    );
+    return;
+  }
+
+  if (mode === "computer" && game.turn() === "b" && engineBusy) {
+    setStatus("Stockfish is thinking...", true);
+  } else {
+    setStatus(
+      game.turn() === "w" ? "Your turn — White to move" :
+      mode === "computer" ? "Stockfish to move" : "Black to move",
+      false
+    );
+  }
+}
+
+function renderBoard() {
+  const boardElement = $("board");
+  boardElement.innerHTML = "";
+
+  const position = game.board();
+
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const squareName = FILES[col] + (8 - row);
+      const piece = position[row][col];
+      const square = document.createElement("button");
+
+      square.type = "button";
+      square.className =
+        "square " + ((row + col) % 2 === 0 ? "light" : "dark");
+
+      square.dataset.square = squareName;
+      square.setAttribute(
+        "aria-label",
+        squareName + (piece ? ", " + piece.color + " " + piece.type : "")
+      );
+
+      if (lastMove &&
+          (squareName === lastMove.from || squareName === lastMove.to)) {
+        square.classList.add("last-move");
+      }
+
+      if (selectedSquare === squareName) {
+        square.classList.add("selected");
+      }
+
+      if (piece) {
+        const span = document.createElement("span");
+        span.className = "piece " +
+          (piece.color === "w" ? "white-piece" : "black-piece");
+        span.textContent = PIECES[piece.color + piece.type];
+        square.appendChild(span);
+      }
+
+      if (legalTargets.includes(squareName)) {
+        const targetPiece = game.get(squareName);
+        const marker = document.createElement("span");
+        marker.className = targetPiece ? "legal-capture" : "legal-dot";
+        square.appendChild(marker);
+      }
+
+      if (col === 0) {
+        const rankLabel = document.createElement("span");
+        rankLabel.className = "coordinate rank";
+        rankLabel.textContent = 8 - row;
+        square.appendChild(rankLabel);
+      }
+
+      if (row === 7) {
+        const fileLabel = document.createElement("span");
+        fileLabel.className = "coordinate file";
+        fileLabel.textContent = FILES[col];
+        square.appendChild(fileLabel);
+      }
+
+      square.addEventListener("click", () => handleSquareClick(squareName));
+      boardElement.appendChild(square);
+    }
+  }
+
+  renderHistory();
+  updateClocks();
+}
+
+function renderHistory() {
+  const container = $("history");
+  container.innerHTML = "";
+
+  const history = game.history();
+
+  if (!history.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-history";
+    empty.textContent = "Your moves will appear here.";
+    container.appendChild(empty);
+    return;
+  }
+
+  for (let i = 0; i < history.length; i += 2) {
+    const row = document.createElement("div");
+    row.className = "history-row";
+
+    const number = document.createElement("span");
+    number.className = "move-number";
+    number.textContent = (Math.floor(i / 2) + 1) + ".";
+
+    const white = document.createElement("span");
+    white.className = "move-san";
+    white.textContent = history[i] || "";
+
+    const black = document.createElement("span");
+    black.className = "move-san";
+    black.textContent = history[i + 1] || "";
+
+    row.append(number, white, black);
+    container.appendChild(row);
+  }
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function handleSquareClick(square) {
+  if (gameOver || engineBusy) return;
+
+  if (mode === "computer" && game.turn() !== "w") return;
+
+  const clickedPiece = game.get(square);
+
+  if (selectedSquare && legalTargets.includes(square)) {
+    makeHumanMove(selectedSquare, square);
+    return;
+  }
+
+  if (clickedPiece && clickedPiece.color === game.turn()) {
+    selectedSquare = square;
+    legalTargets = game.moves({
+      square: square,
+      verbose: true
+    }).map(move => move.to);
+
+    renderBoard();
+    return;
+  }
+
+  selectedSquare = null;
+  legalTargets = [];
+  renderBoard();
+}
+
+function makeHumanMove(from, to) {
+  const piece = game.get(from);
+  let promotion = "q";
+
+  // Simple promotion choice: queen by default.
+  // Change this to "r", "b" or "n" if desired.
+  if (piece && piece.type === "p" &&
+      (to.endsWith("8") || to.endsWith("1"))) {
+    promotion = "q";
+  }
+
+  const result = game.move({
+    from: from,
+    to: to,
+    promotion: promotion
+  });
+
+  selectedSquare = null;
+  legalTargets = [];
+
+  if (!result) {
+    renderBoard();
+    return;
+  }
+
+  lastMove = { from: result.from, to: result.to };
+  startClock();
+  renderBoard();
+  updateStatus();
+
+  if (!gameOver && mode === "computer" && game.turn() === "b") {
+    requestEngineMove();
+  }
+}
+
+function makeEngineMove(uci) {
+  if (gameOver || mode !== "computer" || game.turn() !== "b") return;
+
+  const from = uci.slice(0, 2);
+  const to = uci.slice(2, 4);
+  const promotion = uci.length >= 5 ? uci[4] : "q";
+
+  const result = game.move({
+    from: from,
+    to: to,
+    promotion: promotion
+  });
+
+  if (!result) {
+    setStatus("Engine returned an invalid move. Reset to try again.");
+    return;
+  }
+
+  lastMove = { from: result.from, to: result.to };
+  selectedSquare = null;
+  legalTargets = [];
+
+  renderBoard();
+  updateStatus();
+}
+
+function historyToUci() {
+  return game.history({ verbose: true }).map(move => {
+    return move.from + move.to + (move.promotion || "");
+  });
+}
+
+function stopEngineSearch() {
+  engineRequestId++;
+
+  if (stockfish && engineReady) {
+    try { stockfish.postMessage("stop"); } catch (_) {}
+  }
+
+  engineBusy = false;
+  pendingEngineRequest = null;
+}
+
+function requestEngineMove() {
+  if (!stockfish || !engineReady || engineFailed || gameOver) {
+    setStatus(
+      "Stockfish is unavailable. Check your internet connection or reload."
+    );
+    return;
+  }
+
+  if (game.turn() !== "b" || mode !== "computer") return;
+
+  engineBusy = true;
+  const requestId = ++engineRequestId;
+  pendingEngineRequest = requestId;
+
+  setStatus("Stockfish is thinking...", true);
+
+  // UCI format: start position plus all played moves.
+  const moves = historyToUci().join(" ");
+
+  stockfish.postMessage("stop");
+  stockfish.postMessage("ucinewgame");
+  stockfish.postMessage(
+    moves ? "position startpos moves " + moves : "position startpos"
+  );
+
+  const depth = Number($("difficulty").value) || 10;
+  stockfish.postMessage("go depth " + depth);
+}
+
+function initializeEngine() {
+  $("engineBadge").textContent = "LOADING ENGINE";
+
+  try {
+    /*
+     * A Blob worker wrapper allows the CDN script to be loaded
+     * from inside a dedicated worker rather than directly using
+     * a cross-origin Worker URL.
+     */
+    const wrapper = `
+      importScripts("${STOCKFISH_URL}");
+    `;
+
+    const blob = new Blob([wrapper], {
+      type: "application/javascript"
+    });
+
+    const workerUrl = URL.createObjectURL(blob);
+    stockfish = new Worker(workerUrl);
+
+    stockfish.onmessage = function(event) {
+      const line = typeof event.data === "string"
+        ? event.data
+        : String(event.data || "");
+
+      if (line === "uciok") {
+        stockfish.postMessage("isready");
+        return;
+      }
+
+      if (line === "readyok") {
+        engineReady = true;
+        $("engineBadge").textContent = "ENGINE READY";
+        updateStatus();
+        return;
+      }
+
+      if (line.startsWith("bestmove")) {
+        const requestId = pendingEngineRequest;
+
+        engineBusy = false;
+        pendingEngineRequest = null;
+
+        if (requestId !== engineRequestId) return;
+
+        const match = line.match(/^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/);
+
+        if (!match) {
+          if (!gameOver) updateStatus();
+          return;
+        }
+
+        if (!gameOver && mode === "computer" && game.turn() === "b") {
+          makeEngineMove(match[1]);
+        }
+      }
+    };
+
+    stockfish.onerror = function(error) {
+      console.error("Stockfish worker error:", error);
+      engineFailed = true;
+      engineReady = false;
+      engineBusy = false;
+      $("engineBadge").textContent = "ENGINE ERROR";
+      setStatus("Could not load Stockfish. Check the CDN connection.");
+    };
+
+    stockfish.postMessage("uci");
+  } catch (error) {
+    console.error("Stockfish initialization error:", error);
+    engineFailed = true;
+    $("engineBadge").textContent = "ENGINE ERROR";
+    setStatus("Unable to initialize Stockfish in this browser.");
+  }
+}
+
+function resetGame() {
+  stopEngineSearch();
+  stopClock();
+
+  game.reset();
+  selectedSquare = null;
+  legalTargets = [];
+  lastMove = null;
+  gameOver = false;
+  clockStarted = false;
+
+  const minutes = Number($("timeControl").value) || 10;
+  remaining = { w: minutes * 60, b: minutes * 60 };
+
+  renderBoard();
+  updateStatus();
+}
+
+function undoMove() {
+  if (game.history().length === 0) return;
+
+  stopEngineSearch();
+  stopClock();
+
+  if (mode === "computer") {
+    // Undo the engine's move and the preceding human move together.
+    if (game.history().length > 0) game.undo();
+    if (game.history().length > 0 && game.turn() === "b") game.undo();
+  } else {
+    game.undo();
+  }
+
+  const history = game.history({ verbose: true });
+  const last = history[history.length - 1];
+
+  lastMove = last ? { from: last.from, to: last.to } : null;
+  selectedSquare = null;
+  legalTargets = [];
+  gameOver = false;
+
+  // Restart the configured clock when play resumes.
+  const minutes = Number($("timeControl").value) || 10;
+  remaining = { w: minutes * 60, b: minutes * 60 };
+
+  renderBoard();
+  updateStatus();
+}
+
+function setMode(nextMode) {
+  stopEngineSearch();
+  stopClock();
+
+  mode = nextMode;
+
+  $("computerMode").classList.toggle("active", mode === "computer");
+  $("localMode").classList.toggle("active", mode === "local");
+
+  resetGame();
+
+  if (mode === "local") {
+    setStatus("Two-player mode — White to move");
+  } else {
+    setStatus(
+      engineReady
+        ? "Your turn — White to move"
+        : "Waiting for Stockfish..."
+    );
+  }
+}
+
+$("resetBtn").addEventListener("click", resetGame);
+$("undoBtn").addEventListener("click", undoMove);
+
+$("computerMode").addEventListener("click", () => setMode("computer"));
+$("localMode").addEventListener("click", () => setMode("local"));
+
+$("timeControl").addEventListener("change", resetGame);
+
+$("difficulty").addEventListener("change", () => {
+  if (engineBusy && stockfish) {
+    // Stop the current search and restart at the new depth.
+    stopEngineSearch();
+    if (!gameOver && mode === "computer" && game.turn() === "b") {
+      requestEngineMove();
+    }
+  }
+});
+
+// Start the interface first, then load the external engine.
+renderBoard();
+updateStatus();
+initializeEngine();
+</script>
+</body>
+</html>
