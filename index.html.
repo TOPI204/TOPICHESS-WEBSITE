@@ -7,14 +7,18 @@
 <title>TOPICHESS</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
-
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
 
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#262522;color:white;font-family:Arial,sans-serif}
 .panel{background:#302e2b;border:1px solid #45433f;border-radius:12px}
-#board{width:100%;max-width:600px;margin:auto}
+#board{width:100%;max-width:600px;margin:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:contain}
+#board .square-55d63{touch-action:none}
+#board .square-55d63.selected-square{box-shadow:inset 0 0 0 5px #f6e65b}
+#board .square-55d63.legal-target{position:relative}
+#board .square-55d63.legal-target:after{content:"";position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(30,30,30,.35);top:36%;left:36%;pointer-events:none}
+#board .square-55d63.legal-capture:after{content:"";position:absolute;inset:0;border:5px solid rgba(30,30,30,.35);border-radius:50%;background:transparent;pointer-events:none}
 .player{background:#303138;border:2px solid transparent;border-radius:10px;padding:10px;display:flex;align-items:center;gap:12px}
 .player.active{border-color:#81b64c;background:#353c32}
 .avatar{width:42px;height:42px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:29px;flex-shrink:0}
@@ -39,12 +43,12 @@ body{margin:0;background:#262522;color:white;font-family:Arial,sans-serif}
 @media(max-width:700px){
  .layout{grid-template-columns:1fr!important}
  #board{max-width:100%}
+ .clock{font-size:22px;min-width:85px}
 }
 </style>
 </head>
 
 <body>
-
 <header class="bg-[#1b1a18] p-4">
  <div class="max-w-7xl mx-auto flex justify-between items-center">
   <h1 class="text-2xl font-extrabold"><span class="text-green-400">TOPI</span>CHESS</h1>
@@ -54,159 +58,141 @@ body{margin:0;background:#262522;color:white;font-family:Arial,sans-serif}
 
 <main class="max-w-7xl mx-auto p-3 md:p-5">
 
- <!-- Error display -->
- <div id="load-error" class="hidden panel p-4 mb-4 text-red-400">
-  The chess libraries could not load. Check your internet connection and refresh the page.
+<div id="load-error" class="hidden panel p-4 mb-4 text-red-400">
+ The chess libraries could not load. Check your internet connection and refresh the page.
+</div>
+
+<section class="panel p-4 mb-4">
+ <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div>
+   <label class="block text-sm text-gray-400 mb-2">Game Mode</label>
+   <select id="game-mode" class="w-full bg-[#45433f] p-3 rounded-lg">
+    <option value="bot" selected>Play Against Bot</option>
+    <option value="local">Local 2 Player</option>
+   </select>
+  </div>
+  <div id="bot-settings">
+   <label class="block text-sm text-gray-400 mb-2">Bot Difficulty</label>
+   <select id="bot-level" class="w-full bg-[#45433f] p-3 rounded-lg">
+    <option value="800">Beginner - 800 Elo</option>
+    <option value="1500">Intermediate - 1500 Elo</option>
+   </select>
+  </div>
  </div>
+ <p id="bot-description" class="text-xs text-gray-400 mt-3">
+  Beginner bot: plays simpler moves and sometimes makes mistakes.
+ </p>
+</section>
 
- <!-- Settings -->
- <section class="panel p-4 mb-4">
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-   <div>
-    <label class="block text-sm text-gray-400 mb-2">Game Mode</label>
-    <select id="game-mode" class="w-full bg-[#45433f] p-3 rounded-lg">
-     <option value="bot" selected>Play Against Bot</option>
-     <option value="local">Local 2 Player</option>
-    </select>
+<section id="color-selection" class="panel p-5 mb-4 text-center">
+ <h2 class="text-xl font-bold mb-2">Choose Your Color</h2>
+ <p class="text-gray-400 text-sm mb-4">Select the pieces you want to play.</p>
+ <div class="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+  <button type="button" id="choose-white" class="color-btn"><span class="text-4xl">♔</span><span>White</span></button>
+  <button type="button" id="choose-black" class="color-btn"><span class="text-4xl">♚</span><span>Black</span></button>
+  <button type="button" id="choose-random" class="color-btn"><span class="text-4xl">🎲</span><span>Random</span></button>
+ </div>
+</section>
+
+<section id="game-container" class="hidden">
+ <div class="layout grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-5">
+
+  <div class="min-w-0">
+   <div class="panel p-3 mb-3 flex justify-between items-center gap-2">
+    <div class="flex items-center gap-2">
+     <div class="avatar black-avatar">♚</div>
+     <div>
+      <div id="board-black-name" class="font-bold">Black</div>
+      <div id="board-black-rating" class="text-xs text-gray-400">Player</div>
+     </div>
+    </div>
+    <div id="black-clock" class="clock">03:00</div>
    </div>
 
-   <div id="bot-settings">
-    <label class="block text-sm text-gray-400 mb-2">Bot Difficulty</label>
-    <select id="bot-level" class="w-full bg-[#45433f] p-3 rounded-lg">
-     <option value="800">Beginner - 800 Elo</option>
-     <option value="1500">Intermediate - 1500 Elo</option>
-    </select>
+   <div id="board"></div>
+
+   <div class="panel p-3 mt-3 flex justify-between items-center gap-2">
+    <div class="flex items-center gap-2">
+     <div class="avatar white-avatar">♔</div>
+     <div>
+      <div id="board-white-name" class="font-bold">White</div>
+      <div id="board-white-rating" class="text-xs text-gray-400">Player</div>
+     </div>
+    </div>
+    <div id="white-clock" class="clock">03:00</div>
+   </div>
+
+   <div class="panel p-3 mt-3">
+    <div class="flex flex-wrap justify-center gap-2">
+     <button id="new-game" class="btn green">New Game</button>
+     <button id="undo-move" class="btn">Undo</button>
+     <button id="flip-board" class="btn">Flip Board</button>
+     <button id="change-color" class="btn">Change Color</button>
+    </div>
    </div>
   </div>
-  <p id="bot-description" class="text-xs text-gray-400 mt-3">
-   Beginner bot: plays simpler moves and sometimes makes mistakes.
-  </p>
- </section>
 
- <!-- Color selection -->
- <section id="color-selection" class="panel p-5 mb-4 text-center">
-  <h2 class="text-xl font-bold mb-2">Choose Your Color</h2>
-  <p class="text-gray-400 text-sm mb-4">Select the pieces you want to play.</p>
-
-  <div class="grid grid-cols-3 gap-3 max-w-lg mx-auto">
-   <button type="button" id="choose-white" class="color-btn">
-    <span class="text-4xl">♔</span><span>White</span>
-   </button>
-   <button type="button" id="choose-black" class="color-btn">
-    <span class="text-4xl">♚</span><span>Black</span>
-   </button>
-   <button type="button" id="choose-random" class="color-btn">
-    <span class="text-4xl">🎲</span><span>Random</span>
-   </button>
-  </div>
- </section>
-
- <!-- Game -->
- <section id="game-container" class="hidden">
-  <div class="layout grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-5">
-
-   <!-- Board column -->
-   <div class="min-w-0">
-
-    <div class="panel p-3 mb-3 flex justify-between items-center gap-2">
-     <div class="flex items-center gap-2">
-      <div class="avatar black-avatar">♚</div>
-      <div>
-       <div id="board-black-name" class="font-bold">Black</div>
-       <div id="board-black-rating" class="text-xs text-gray-400">Player</div>
-      </div>
+  <aside class="space-y-4">
+   <div class="panel p-4 space-y-3">
+    <h2 class="font-bold text-lg">Players</h2>
+    <div id="white-player-card" class="player">
+     <div class="avatar white-avatar">♔</div>
+     <div class="flex-1 min-w-0">
+      <div id="white-player-name" class="font-bold">You</div>
+      <div id="white-player-rating" class="text-xs text-gray-400">White</div>
      </div>
-     <div id="black-clock" class="clock">03:00</div>
+     <span id="white-player-turn" class="text-xs text-gray-400">Waiting</span>
     </div>
-
-    <div id="board"></div>
-
-    <div class="panel p-3 mt-3 flex justify-between items-center gap-2">
-     <div class="flex items-center gap-2">
-      <div class="avatar white-avatar">♔</div>
-      <div>
-       <div id="board-white-name" class="font-bold">White</div>
-       <div id="board-white-rating" class="text-xs text-gray-400">Player</div>
-      </div>
+    <div id="black-player-card" class="player">
+     <div class="avatar black-avatar">♚</div>
+     <div class="flex-1 min-w-0">
+      <div id="black-player-name" class="font-bold">Bot</div>
+      <div id="black-player-rating" class="text-xs text-gray-400">Black</div>
      </div>
-     <div id="white-clock" class="clock">03:00</div>
-    </div>
-
-    <div class="panel p-3 mt-3">
-     <div class="flex flex-wrap justify-center gap-2">
-      <button id="new-game" class="btn green">New Game</button>
-      <button id="undo-move" class="btn">Undo</button>
-      <button id="flip-board" class="btn">Flip Board</button>
-      <button id="change-color" class="btn">Change Color</button>
-     </div>
+     <span id="black-player-turn" class="text-xs text-gray-400">Waiting</span>
     </div>
    </div>
 
-   <!-- Sidebar -->
-   <aside class="space-y-4">
+   <div class="panel p-4">
+    <h2 class="font-bold text-lg mb-3">Captured Pieces</h2>
+    <div class="text-xs text-gray-400">Captured by White</div>
+    <div id="white-captures" class="capture-list">—</div>
+    <div class="text-xs text-gray-400 mt-3">Captured by Black</div>
+    <div id="black-captures" class="capture-list">—</div>
+    <div id="material-advantage" class="text-sm font-bold mt-3 text-green-400">Equal material</div>
+   </div>
 
-    <div class="panel p-4 space-y-3">
-     <h2 class="font-bold text-lg">Players</h2>
-     <div id="white-player-card" class="player">
-      <div class="avatar white-avatar">♔</div>
-      <div class="flex-1 min-w-0">
-       <div id="white-player-name" class="font-bold">You</div>
-       <div id="white-player-rating" class="text-xs text-gray-400">White</div>
-      </div>
-      <span id="white-player-turn" class="text-xs text-gray-400">Waiting</span>
-     </div>
-     <div id="black-player-card" class="player">
-      <div class="avatar black-avatar">♚</div>
-      <div class="flex-1 min-w-0">
-       <div id="black-player-name" class="font-bold">Bot</div>
-       <div id="black-player-rating" class="text-xs text-gray-400">Black</div>
-      </div>
-      <span id="black-player-turn" class="text-xs text-gray-400">Waiting</span>
-     </div>
+   <div class="panel p-4">
+    <h2 class="font-bold text-lg mb-3">Time Control</h2>
+    <div class="grid grid-cols-2 gap-2">
+     <button id="mode-bullet" class="btn">1 min</button>
+     <button id="mode-blitz" class="btn green">3 min</button>
+     <button id="mode-rapid" class="btn">10 min</button>
+     <button id="mode-untimed" class="btn">Untimed</button>
     </div>
+    <div id="clock-message" class="text-xs text-gray-400 mt-3">Blitz time control</div>
+   </div>
 
-    <div class="panel p-4">
-     <h2 class="font-bold text-lg mb-3">Captured Pieces</h2>
-     <div class="text-xs text-gray-400">Captured by White</div>
-     <div id="white-captures" class="capture-list">—</div>
-     <div class="text-xs text-gray-400 mt-3">Captured by Black</div>
-     <div id="black-captures" class="capture-list">—</div>
-     <div id="material-advantage" class="text-sm font-bold mt-3 text-green-400">Equal material</div>
+   <div class="panel p-4">
+    <h2 class="font-bold text-lg mb-2">Game Status</h2>
+    <div id="game-status" class="font-bold text-green-400">Choose your color</div>
+    <div id="mode-display" class="text-xs text-gray-400 mt-2">Play Against Bot</div>
+   </div>
+
+   <div class="panel p-4">
+    <div class="flex justify-between mb-3">
+     <h2 class="font-bold text-lg">Move History</h2>
+     <span id="move-count" class="text-xs text-gray-400">0 moves</span>
     </div>
-
-    <div class="panel p-4">
-     <h2 class="font-bold text-lg mb-3">Time Control</h2>
-     <div class="grid grid-cols-2 gap-2">
-      <button id="mode-bullet" class="btn">1 min</button>
-      <button id="mode-blitz" class="btn green">3 min</button>
-      <button id="mode-rapid" class="btn">10 min</button>
-      <button id="mode-untimed" class="btn">Untimed</button>
-     </div>
-     <div id="clock-message" class="text-xs text-gray-400 mt-3">Blitz time control</div>
+    <div id="move-history">
+     <div class="text-gray-500 text-sm text-center py-4">Moves will appear here.</div>
     </div>
-
-    <div class="panel p-4">
-     <h2 class="font-bold text-lg mb-2">Game Status</h2>
-     <div id="game-status" class="font-bold text-green-400">Choose your color</div>
-     <div id="mode-display" class="text-xs text-gray-400 mt-2">Play Against Bot</div>
-    </div>
-
-    <div class="panel p-4">
-     <div class="flex justify-between mb-3">
-      <h2 class="font-bold text-lg">Move History</h2>
-      <span id="move-count" class="text-xs text-gray-400">0 moves</span>
-     </div>
-     <div id="move-history">
-      <div class="text-gray-500 text-sm text-center py-4">Moves will appear here.</div>
-     </div>
-    </div>
-
-   </aside>
-  </div>
- </section>
+   </div>
+  </aside>
+ </div>
+</section>
 </main>
 
-<!-- Dependencies: load in this order -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
@@ -214,204 +200,207 @@ body{margin:0;background:#262522;color:white;font-family:Arial,sans-serif}
 <script>
 "use strict";
 
-/* =========================================
-   CHECK LIBRARIES
-========================================= */
-
-if (typeof window.jQuery === "undefined" ||
-    typeof window.Chess === "undefined" ||
-    typeof window.Chessboard === "undefined") {
-  document.getElementById("load-error").classList.remove("hidden");
-  throw new Error("TOPICHESS: Required chess libraries did not load.");
+if (!window.jQuery || !window.Chess || !window.Chessboard) {
+ document.getElementById("load-error").classList.remove("hidden");
+ throw new Error("TOPICHESS: Chess libraries failed to load.");
 }
-
-/* =========================================
-   GAME VARIABLES
-========================================= */
 
 const game = new Chess();
 let board = null;
 
 let gameMode = "bot";
 let botElo = 800;
-
 let humanColor = "w";
 let botColor = "b";
-
 let botThinking = false;
 let botTimeout = null;
 
 let selectedTime = 180;
 let selectedMode = "Blitz";
-
 let remainingMs = {w:180000,b:180000};
 let activeClock = null;
 let clockStartedAt = null;
 let timerInterval = null;
 let timedOut = null;
 
-const PIECE_VALUES = {
- p:100,n:320,b:330,r:500,q:900,k:20000
-};
+let selectedSquare = null;
+let legalTargets = [];
 
-const BLACK_PIECES = {
- p:"♟",n:"♞",b:"♝",r:"♜",q:"♛"
-};
+const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
+const BLACK_PIECES = {p:"♟",n:"♞",b:"♝",r:"♜",q:"♛"};
+const WHITE_PIECES = {p:"♙",n:"♘",b:"♗",r:"♖",q:"♕"};
 
-const WHITE_PIECES = {
- p:"♙",n:"♘",b:"♗",r:"♖",q:"♕"
-};
+/* BOARD AND TAP CONTROLS */
 
-/* =========================================
-   BOARD
-========================================= */
+function clearSelection(){
+ selectedSquare = null;
+ legalTargets = [];
+ document.querySelectorAll("#board .square-55d63").forEach(s=>{
+  s.classList.remove("selected-square","legal-target","legal-capture");
+ });
+}
 
-function onDragStart(source,piece) {
- if (game.game_over() || timedOut || botThinking) return false;
+function showSelection(square){
+ clearSelection();
+ selectedSquare = square;
+ legalTargets = game.moves({square:square,verbose:true});
 
- if (gameMode === "bot") {
-  if (game.turn() === botColor) return false;
-  if (humanColor === "w" && piece.startsWith("b")) return false;
-  if (humanColor === "b" && piece.startsWith("w")) return false;
- }
+ const selected = document.querySelector("#board .square-"+square);
+ if(selected) selected.classList.add("selected-square");
+
+ legalTargets.forEach(move=>{
+  const target = document.querySelector("#board .square-"+move.to);
+  if(target){
+   target.classList.add(move.captured ? "legal-capture" : "legal-target");
+  }
+ });
+}
+
+function canSelectPiece(piece){
+ if(!piece || piece.color !== game.turn()) return false;
+ if(game.game_over() || timedOut || botThinking) return false;
+
+ if(gameMode === "bot" && piece.color !== humanColor) return false;
 
  return true;
 }
 
-function onDrop(source,target) {
- if (timedOut || botThinking) return "snapback";
+function handleSquareTap(square){
+ if(!square || game.game_over() || timedOut || botThinking) return;
+ if(gameMode === "bot" && game.turn() === botColor) return;
 
- if (gameMode === "bot" && game.turn() === botColor) {
-  return "snapback";
+ const piece = game.get(square);
+
+ if(selectedSquare){
+  if(square === selectedSquare){
+   clearSelection();
+   return;
+  }
+
+  const legalMove = legalTargets.find(m=>m.to===square);
+
+  if(legalMove){
+   if(selectedTime > 0){
+    tickClock();
+    if(timedOut) return;
+   }
+
+   const move = game.move({
+    from:selectedSquare,
+    to:square,
+    promotion:"q"
+   });
+
+   clearSelection();
+
+   if(move){
+    board.position(game.fen());
+    switchClock();
+    updateEverything();
+
+    if(gameMode === "bot" && !game.game_over()){
+     scheduleBotTurn();
+    }
+   }
+   return;
+  }
+
+  if(canSelectPiece(piece)){
+   showSelection(square);
+   return;
+  }
+
+  clearSelection();
+  return;
  }
 
- if (selectedTime > 0) {
-  tickClock();
-  if (timedOut) return "snapback";
+ if(canSelectPiece(piece)){
+  showSelection(square);
  }
-
- const move = game.move({
-  from:source,
-  to:target,
-  promotion:"q"
- });
-
- if (!move) return "snapback";
-
- switchClock();
- updateEverything();
-
- if (gameMode === "bot" && !game.game_over()) {
-  scheduleBotTurn();
- }
-
- return undefined;
-}
-
-function onSnapEnd() {
- board.position(game.fen());
 }
 
 board = Chessboard("board",{
- draggable:true,
+ draggable:false,
  position:"start",
  orientation:"white",
- pieceTheme:"https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png",
- onDragStart:onDragStart,
- onDrop:onDrop,
- onSnapEnd:onSnapEnd
+ pieceTheme:"https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
 });
 
-window.addEventListener("resize",function(){
- if (board) board.resize();
+$("#board").on("click", ".square-55d63", function(){
+ const match = this.className.match(/square-([a-h][1-8])/);
+ if(match) handleSquareTap(match[1]);
 });
 
-/* =========================================
-   COLOR SELECTION
-========================================= */
+window.addEventListener("resize",()=>{if(board) board.resize();});
 
-function startWithColor(choice) {
- if (choice === "random") {
-  humanColor = Math.random() < 0.5 ? "w" : "b";
- } else {
+/* Prevent page scrolling only while touching the chessboard */
+const boardElement = document.getElementById("board");
+boardElement.addEventListener("touchmove",function(e){
+ e.preventDefault();
+},{passive:false});
+
+/* COLOR SELECTION */
+
+function startWithColor(choice){
+ if(choice === "random"){
+  humanColor = Math.random()<0.5 ? "w" : "b";
+ }else{
   humanColor = choice;
  }
-
  botColor = humanColor === "w" ? "b" : "w";
 
  document.getElementById("color-selection").classList.add("hidden");
  document.getElementById("game-container").classList.remove("hidden");
-
  startFreshGame();
 }
 
-document.getElementById("choose-white").addEventListener("click",function(){
- startWithColor("w");
-});
+document.getElementById("choose-white").addEventListener("click",()=>startWithColor("w"));
+document.getElementById("choose-black").addEventListener("click",()=>startWithColor("b"));
+document.getElementById("choose-random").addEventListener("click",()=>startWithColor("random"));
 
-document.getElementById("choose-black").addEventListener("click",function(){
- startWithColor("b");
-});
+/* RESET AND NEW GAME */
 
-document.getElementById("choose-random").addEventListener("click",function(){
- startWithColor("random");
-});
-
-/* =========================================
-   GAME RESET
-========================================= */
-
-function cancelBotMove() {
- if (botTimeout !== null) {
+function cancelBotMove(){
+ if(botTimeout !== null){
   clearTimeout(botTimeout);
   botTimeout = null;
  }
  botThinking = false;
 }
 
-function startFreshGame() {
+function startFreshGame(){
  cancelBotMove();
-
+ clearSelection();
  stopClock();
  timedOut = null;
-
  game.reset();
 
- if (gameMode === "bot") {
-  board.orientation(humanColor === "w" ? "white" : "black");
- } else {
-  board.orientation("white");
- }
-
+ board.orientation(gameMode === "bot" && humanColor === "b" ? "black" : "white");
  board.position("start");
 
- remainingMs.w = selectedTime * 1000;
- remainingMs.b = selectedTime * 1000;
+ remainingMs.w = selectedTime*1000;
+ remainingMs.b = selectedTime*1000;
 
  resetClock();
  updateEverything();
+ startClock();
 
- // If the human chose Black, the bot is White.
- // White moves first automatically.
- if (gameMode === "bot" && botColor === "w") {
+ if(gameMode === "bot" && botColor === "w"){
   scheduleBotTurn();
  }
 }
 
-/* =========================================
-   MODE AND DIFFICULTY
-========================================= */
+/* MODE AND DIFFICULTY */
 
 document.getElementById("game-mode").addEventListener("change",function(){
  gameMode = this.value;
-
- document.getElementById("bot-settings")
-  .classList.toggle("hidden",gameMode !== "bot");
+ document.getElementById("bot-settings").classList.toggle("hidden",gameMode !== "bot");
 
  cancelBotMove();
+ clearSelection();
  stopClock();
 
- if (gameMode === "bot") {
+ if(gameMode === "bot"){
   document.getElementById("game-container").classList.add("hidden");
   document.getElementById("color-selection").classList.remove("hidden");
   game.reset();
@@ -419,7 +408,7 @@ document.getElementById("game-mode").addEventListener("change",function(){
   board.orientation("white");
   updateEverything();
   document.getElementById("game-status").textContent = "Choose your color";
- } else {
+ }else{
   document.getElementById("color-selection").classList.add("hidden");
   document.getElementById("game-container").classList.remove("hidden");
   startFreshGame();
@@ -428,53 +417,45 @@ document.getElementById("game-mode").addEventListener("change",function(){
 
 document.getElementById("bot-level").addEventListener("change",function(){
  botElo = Number(this.value);
-
  document.getElementById("bot-description").textContent =
   botElo <= 800
-   ? "Beginner bot: simpler moves and occasional mistakes."
-   : "Intermediate bot: considers more tactical replies.";
+  ? "Beginner bot: simpler moves and occasional mistakes."
+  : "Intermediate bot: considers more tactical replies.";
 
- if (gameMode === "bot" &&
-     !document.getElementById("game-container").classList.contains("hidden")) {
+ if(gameMode === "bot" && !document.getElementById("game-container").classList.contains("hidden")){
   startFreshGame();
  }
-
  updatePlayerProfiles();
 });
 
-/* =========================================
-   BOT EVALUATION
-========================================= */
+/* BOT EVALUATION */
 
-function evaluateBoard() {
+function evaluateBoard(){
  let score = 0;
  const position = game.board();
 
- for (let r=0;r<8;r++) {
-  for (let c=0;c<8;c++) {
+ for(let r=0;r<8;r++){
+  for(let c=0;c<8;c++){
    const p = position[r][c];
-   if (!p) continue;
+   if(!p) continue;
 
    let value = PIECE_VALUES[p.type];
-
-   if (p.type !== "k") {
+   if(p.type !== "k"){
     const center = Math.abs(3.5-r)+Math.abs(3.5-c);
     value += Math.max(0,7-center)*2;
    }
-
    score += p.color === "w" ? value : -value;
   }
  }
-
  return score;
 }
 
-function evaluateForSideToMove() {
+function evaluateForSideToMove(){
  const score = evaluateBoard();
  return game.turn() === "w" ? score : -score;
 }
 
-function orderMoves(moves) {
+function orderMoves(moves){
  return moves.sort((a,b)=>{
   const va = a.captured ? PIECE_VALUES[a.captured] : 0;
   const vb = b.captured ? PIECE_VALUES[b.captured] : 0;
@@ -482,166 +463,139 @@ function orderMoves(moves) {
  });
 }
 
-/* =========================================
-   BEGINNER BOT
-========================================= */
+/* BEGINNER BOT */
 
-function beginnerBotMove() {
+function beginnerBotMove(){
  const moves = game.moves({verbose:true});
- if (!moves.length) return null;
+ if(!moves.length) return null;
 
- let candidates = [];
+ const candidates = [];
  let best = -Infinity;
 
- for (const move of moves) {
+ for(const move of moves){
   game.move(move);
-
   let score = evaluateForSideToMove();
   const replies = game.moves({verbose:true});
 
-  if (replies.length) {
+  if(replies.length){
    let worst = Infinity;
-
-   for (const reply of replies) {
+   for(const reply of replies){
     game.move(reply);
     const replyScore = evaluateForSideToMove();
     game.undo();
-
-    // Convert opponent's score to bot's perspective.
     worst = Math.min(worst,-replyScore);
    }
-
    score = worst;
-  } else if (game.in_checkmate()) {
+  }else if(game.in_checkmate()){
    score = 100000;
   }
 
   game.undo();
-
   candidates.push({move,score});
   best = Math.max(best,score);
  }
 
  const safe = candidates.filter(x=>x.score >= best-300);
  const weak = candidates.filter(x=>x.score < best-300);
-
  let pool = safe;
-
- if (weak.length && Math.random()<0.35) pool=weak;
+ if(weak.length && Math.random()<0.35) pool = weak;
 
  return pool[Math.floor(Math.random()*pool.length)].move;
 }
 
-/* =========================================
-   INTERMEDIATE BOT
-========================================= */
+/* INTERMEDIATE BOT */
 
-function minimax(depth,alpha,beta,ply) {
- if (game.in_checkmate()) return -100000+ply;
- if (game.in_draw()) return 0;
-
- if (depth===0) return evaluateForSideToMove();
+function minimax(depth,alpha,beta,ply){
+ if(game.in_checkmate()) return -100000+ply;
+ if(game.in_draw()) return 0;
+ if(depth===0) return evaluateForSideToMove();
 
  const moves = orderMoves(game.moves({verbose:true}));
- if (!moves.length) return 0;
+ if(!moves.length) return 0;
 
  let best = -Infinity;
 
- for (const move of moves) {
+ for(const move of moves){
   game.move(move);
-
   const score = -minimax(depth-1,-beta,-alpha,ply+1);
-
   game.undo();
 
   best = Math.max(best,score);
   alpha = Math.max(alpha,score);
-
-  if (alpha>=beta) break;
+  if(alpha>=beta) break;
  }
-
  return best;
 }
 
-function intermediateBotMove() {
+function intermediateBotMove(){
  const moves = orderMoves(game.moves({verbose:true}));
- if (!moves.length) return null;
+ if(!moves.length) return null;
 
  let bestMove = null;
  let bestScore = -Infinity;
  let alpha = -Infinity;
  const beta = Infinity;
 
- for (const move of moves) {
+ for(const move of moves){
   game.move(move);
-
   const score = -minimax(2,-beta,-alpha,1);
-
   game.undo();
 
-  if (score>bestScore) {
-   bestScore=score;
-   bestMove=move;
+  if(score>bestScore){
+   bestScore = score;
+   bestMove = move;
   }
-
-  alpha=Math.max(alpha,score);
+  alpha = Math.max(alpha,score);
  }
-
  return bestMove;
 }
 
-function calculateBotMove() {
- return botElo<=800
-  ? beginnerBotMove()
-  : intermediateBotMove();
+function calculateBotMove(){
+ return botElo<=800 ? beginnerBotMove() : intermediateBotMove();
 }
 
-/* =========================================
-   BOT TURN
-========================================= */
+/* BOT TURN */
 
-function scheduleBotTurn() {
- if (gameMode!=="bot" || game.game_over() ||
-     timedOut || game.turn()!==botColor) return;
+function scheduleBotTurn(){
+ if(gameMode!=="bot" || game.game_over() || timedOut || game.turn()!==botColor) return;
 
  cancelBotMove();
- botThinking=true;
-
+ botThinking = true;
+ clearSelection();
  updateStatus();
 
- botTimeout=setTimeout(function(){
-  botTimeout=null;
+ botTimeout = setTimeout(()=>{
+  botTimeout = null;
   makeBotMove();
  },450);
 }
 
-function makeBotMove() {
- if (gameMode!=="bot" || game.game_over() ||
-     timedOut || game.turn()!==botColor) {
-  botThinking=false;
+function makeBotMove(){
+ if(gameMode!=="bot" || game.game_over() || timedOut || game.turn()!==botColor){
+  botThinking = false;
   return;
  }
 
- if (selectedTime>0) {
+ if(selectedTime>0){
   tickClock();
-  if (timedOut) {
-   botThinking=false;
+  if(timedOut){
+   botThinking = false;
    return;
   }
  }
 
  const chosen = calculateBotMove();
 
- if (selectedTime>0) {
+ if(selectedTime>0){
   tickClock();
-  if (timedOut) {
-   botThinking=false;
+  if(timedOut){
+   botThinking = false;
    return;
   }
  }
 
- if (!chosen) {
-  botThinking=false;
+ if(!chosen){
+  botThinking = false;
   updateEverything();
   return;
  }
@@ -652,9 +606,8 @@ function makeBotMove() {
   promotion:"q"
  });
 
- botThinking=false;
-
- if (!move) {
+ botThinking = false;
+ if(!move){
   updateEverything();
   return;
  }
@@ -664,20 +617,16 @@ function makeBotMove() {
  updateEverything();
 }
 
-/* =========================================
-   CHESS CLOCK
-========================================= */
+/* CHESS CLOCK */
 
-function formatClock(ms) {
+function formatClock(ms){
  const seconds = Math.ceil(Math.max(0,ms)/1000);
  const minutes = Math.floor(seconds/60);
  const remainder = seconds%60;
-
- return String(minutes).padStart(2,"0")+":"+
-        String(remainder).padStart(2,"0");
+ return String(minutes).padStart(2,"0")+":"+String(remainder).padStart(2,"0");
 }
 
-function renderClocks() {
+function renderClocks(){
  const white = document.getElementById("white-clock");
  const black = document.getElementById("black-clock");
 
@@ -686,373 +635,62 @@ function renderClocks() {
 
  white.classList.toggle("active",activeClock==="w");
  black.classList.toggle("active",activeClock==="b");
-
  white.classList.toggle("expired",timedOut==="w");
  black.classList.toggle("expired",timedOut==="b");
 }
 
-function stopClock() {
- if (timerInterval!==null) {
+function stopClock(){
+ if(timerInterval!==null){
   clearInterval(timerInterval);
-  timerInterval=null;
+  timerInterval = null;
  }
 
- if (activeClock && clockStartedAt!==null && selectedTime>0) {
-  const elapsed=performance.now()-clockStartedAt;
-  remainingMs[activeClock]=Math.max(0,remainingMs[activeClock]-elapsed);
+ if(activeClock && clockStartedAt!==null && selectedTime>0){
+  const elapsed = performance.now()-clockStartedAt;
+  remainingMs[activeClock] = Math.max(0,remainingMs[activeClock]-elapsed);
  }
 
- activeClock=null;
- clockStartedAt=null;
+ activeClock = null;
+ clockStartedAt = null;
  renderClocks();
 }
 
-function startClock() {
- if (selectedTime===0 || timedOut || game.game_over()) {
+function startClock(){
+ if(selectedTime===0 || timedOut || game.game_over()){
   renderClocks();
   return;
  }
 
- if (timerInterval!==null) clearInterval(timerInterval);
+ if(timerInterval!==null) clearInterval(timerInterval);
 
- activeClock=game.turn();
- clockStartedAt=performance.now();
- timerInterval=setInterval(tickClock,100);
-
+ activeClock = game.turn();
+ clockStartedAt = performance.now();
+ timerInterval = setInterval(tickClock,100);
  renderClocks();
 }
 
-function tickClock() {
- if (!activeClock || selectedTime===0 || timedOut) return;
+function tickClock(){
+ if(!activeClock || selectedTime===0 || timedOut) return;
 
- const now=performance.now();
- const elapsed=now-clockStartedAt;
+ const now = performance.now();
+ const elapsed = now-clockStartedAt;
+ remainingMs[activeClock] -= elapsed;
+ clockStartedAt = now;
 
- remainingMs[activeClock]-=elapsed;
- clockStartedAt=now;
-
- if (remainingMs[activeClock]<=0) {
-  remainingMs[activeClock]=0;
+ if(remainingMs[activeClock]<=0){
+  remainingMs[activeClock] = 0;
   handleTimeout(activeClock);
   return;
  }
-
  renderClocks();
 }
 
-function handleTimeout(player) {
- if (timedOut) return;
+function handleTimeout(player){
+ if(timedOut) return;
 
- if (timerInterval!==null) {
+ if(timerInterval!==null){
   clearInterval(timerInterval);
-  timerInterval=null;
+  timerInterval = null;
  }
 
- timedOut=player;
- activeClock=null;
- clockStartedAt=null;
-
- cancelBotMove();
-
- document.getElementById("clock-message").textContent =
-  (player==="w"?"White":"Black")+" ran out of time.";
-
- updateEverything();
- renderClocks();
-}
-
-function switchClock() {
- if (selectedTime>0) {
-  tickClock();
-  if (timedOut) return;
- }
-
- if (game.game_over()) {
-  if (timerInterval!==null) clearInterval(timerInterval);
-  timerInterval=null;
-  activeClock=null;
-  clockStartedAt=null;
-  renderClocks();
-  return;
- }
-
- if (selectedTime>0) {
-  activeClock=game.turn();
-  clockStartedAt=performance.now();
-
-  if (timerInterval===null) {
-   timerInterval=setInterval(tickClock,100);
-  }
- }
-
- renderClocks();
-}
-
-function resetClock() {
- stopClock();
-
- remainingMs.w=selectedTime*1000;
- remainingMs.b=selectedTime*1000;
- timedOut=null;
-
- document.getElementById("clock-message").textContent =
-  selectedTime===0 ? "Untimed game" : selectedMode+" time control";
-
- renderClocks();
-
- if (selectedTime>0) startClock();
-}
-
-function selectTimeControl(seconds,mode) {
- selectedTime=seconds;
- selectedMode=mode;
-
- const active = !document.getElementById("game-container").classList.contains("hidden");
-
- if (active) {
-  startFreshGame();
- } else {
-  remainingMs.w=seconds*1000;
-  remainingMs.b=seconds*1000;
-  renderClocks();
- }
-
- document.getElementById("mode-bullet").classList.toggle("green",mode==="Bullet");
- document.getElementById("mode-blitz").classList.toggle("green",mode==="Blitz");
- document.getElementById("mode-rapid").classList.toggle("green",mode==="Rapid");
- document.getElementById("mode-untimed").classList.toggle("green",mode==="Untimed");
-}
-
-document.getElementById("mode-bullet").addEventListener("click",()=>selectTimeControl(60,"Bullet"));
-document.getElementById("mode-blitz").addEventListener("click",()=>selectTimeControl(180,"Blitz"));
-document.getElementById("mode-rapid").addEventListener("click",()=>selectTimeControl(600,"Rapid"));
-document.getElementById("mode-untimed").addEventListener("click",()=>selectTimeControl(0,"Untimed"));
-
-/* =========================================
-   PLAYER PROFILES
-========================================= */
-
-function updatePlayerProfiles() {
- const whiteName=gameMode==="bot"
-  ? (humanColor==="w"?"You":"TOPICHESS Bot")
-  : "Player 1";
-
- const blackName=gameMode==="bot"
-  ? (humanColor==="b"?"You":"TOPICHESS Bot")
-  : "Player 2";
-
- document.getElementById("white-player-name").textContent=whiteName;
- document.getElementById("black-player-name").textContent=blackName;
- document.getElementById("board-white-name").textContent=whiteName;
- document.getElementById("board-black-name").textContent=blackName;
-
- document.getElementById("white-player-rating").textContent=
-  gameMode==="bot" && botColor==="w" ? "White · "+botElo+" Elo" : "White · Player";
-
- document.getElementById("black-player-rating").textContent=
-  gameMode==="bot" && botColor==="b" ? "Black · "+botElo+" Elo" : "Black · Player";
-
- document.getElementById("board-white-rating").textContent=
-  gameMode==="bot" && botColor==="w" ? "White · "+botElo+" Elo" : "White";
-
- document.getElementById("board-black-rating").textContent=
-  gameMode==="bot" && botColor==="b" ? "Black · "+botElo+" Elo" : "Black";
-
- document.getElementById("mode-display").textContent=
-  gameMode==="bot"?"Play Against Bot":"Local 2 Player";
-}
-
-function updateActivePlayer() {
- const whiteActive=game.turn()==="w"&&!game.game_over()&&!timedOut;
- const blackActive=game.turn()==="b"&&!game.game_over()&&!timedOut;
-
- document.getElementById("white-player-card").classList.toggle("active",whiteActive);
- document.getElementById("black-player-card").classList.toggle("active",blackActive);
-
- document.getElementById("white-player-turn").textContent=
-  timedOut==="w"?"Time out":whiteActive?"Playing":"Waiting";
-
- document.getElementById("black-player-turn").textContent=
-  timedOut==="b"?"Time out":blackActive?"Playing":"Waiting";
-}
-
-/* =========================================
-   CAPTURED PIECES
-========================================= */
-
-function updateCapturedPieces() {
- const history=game.history({verbose:true});
- const white=[];
- const black=[];
- let whiteScore=0;
- let blackScore=0;
-
- history.forEach(move=>{
-  if (!move.captured) return;
-
-  if (move.color==="w") {
-   white.push(move.captured);
-   whiteScore+=PIECE_VALUES[move.captured];
-  } else {
-   black.push(move.captured);
-   blackScore+=PIECE_VALUES[move.captured];
-  }
- });
-
- document.getElementById("white-captures").textContent=
-  white.length?white.map(p=>BLACK_PIECES[p]).join(" "):"—";
-
- document.getElementById("black-captures").textContent=
-  black.length?black.map(p=>WHITE_PIECES[p]).join(" "):"—";
-
- const advantage=whiteScore-blackScore;
-
- document.getElementById("material-advantage").textContent=
-  advantage>0?"White +"+advantage/100:
-  advantage<0?"Black +"+Math.abs(advantage)/100:
-  "Equal material";
-}
-
-/* =========================================
-   MOVE HISTORY
-========================================= */
-
-function updateMoveHistory() {
- const history=game.history();
- const container=document.getElementById("move-history");
-
- document.getElementById("move-count").textContent=
-  history.length+(history.length===1?" move":" moves");
-
- if (!history.length) {
-  container.innerHTML='<div class="text-gray-500 text-sm text-center py-4">Moves will appear here.</div>';
-  return;
- }
-
- let html="";
-
- for (let i=0;i<history.length;i+=2) {
-  const number=Math.floor(i/2)+1;
-  const white=history[i]||"";
-  const black=history[i+1]||"";
-
-  html+=`
-   <div class="move-row">
-    <div class="text-gray-400">${number}.</div>
-    <div class="move-san ${i===history.length-1?"latest":""}">${white}</div>
-    <div class="move-san ${i+1===history.length-1?"latest":""}">${black}</div>
-   </div>`;
- }
-
- container.innerHTML=html;
- container.scrollTop=container.scrollHeight;
-}
-
-/* =========================================
-   GAME STATUS
-========================================= */
-
-function updateStatus() {
- const status=document.getElementById("game-status");
-
- if (timedOut) {
-  status.textContent=(timedOut==="w"?"Black":"White")+" wins on time!";
-  status.className="font-bold text-red-400";
-  updateActivePlayer();
-  return;
- }
-
- let message;
-
- if (game.in_checkmate()) {
-  message="Checkmate! "+(game.turn()==="w"?"Black":"White")+" wins!";
- } else if (game.in_draw()) {
-  message="Game drawn!";
- } else {
-  message=(game.turn()==="w"?"White":"Black")+" to move";
-
-  if (game.in_check()) message+=" · Check";
-  if (gameMode==="bot" && game.turn()===botColor) message+=" · Bot thinking";
- }
-
- status.textContent=message;
- status.className="font-bold "+(game.game_over()?"text-yellow-400":"text-green-400");
-
- updateActivePlayer();
-}
-
-function updateEverything() {
- updateStatus();
- updatePlayerProfiles();
- updateCapturedPieces();
- updateMoveHistory();
- updateActivePlayer();
-}
-
-/* =========================================
-   GAME BUTTONS
-========================================= */
-
-document.getElementById("new-game").addEventListener("click",function(){
- cancelBotMove();
- stopClock();
-
- if (gameMode==="bot") {
-  document.getElementById("game-container").classList.add("hidden");
-  document.getElementById("color-selection").classList.remove("hidden");
- } else {
-  startFreshGame();
- }
-});
-
-document.getElementById("change-color").addEventListener("click",function(){
- if (gameMode!=="bot") return;
-
- cancelBotMove();
- stopClock();
-
- document.getElementById("game-container").classList.add("hidden");
- document.getElementById("color-selection").classList.remove("hidden");
-});
-
-document.getElementById("flip-board").addEventListener("click",function(){
- board.flip();
-});
-
-document.getElementById("undo-move").addEventListener("click",function(){
- if (timedOut) return;
-
- cancelBotMove();
-
- if (!game.history().length) return;
-
- game.undo();
-
- if (gameMode==="bot" && game.history().length) {
-  game.undo();
- }
-
- board.position(game.fen());
-
- stopClock();
- resetClock();
- updateEverything();
-
- if (gameMode==="bot" && game.turn()===botColor && !game.game_over()) {
-  scheduleBotTurn();
- }
-});
-
-/* =========================================
-   INITIAL DISPLAY
-========================================= */
-
-updatePlayerProfiles();
-updateActivePlayer();
-updateCapturedPieces();
-updateMoveHistory();
-renderClocks();
-
-</script>
-</body>
-</html>
+ timedOut = 
