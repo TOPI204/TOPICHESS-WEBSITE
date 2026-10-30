@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#312e2b">
+<title>TOPICHESS | Play Chess</title>
+
+<!-- Chess.js provides legal chess rules -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+
+<style>
+:root {
+  --bg: #312e2b;
+  --panel: #262421;
+  --panel2: #3b3835;
+  --green: #769656;
+  --light: #eeeed2;
+  --accent: #81b64c;
+  --text: #ffffff;
+  --muted: #aaa69f;
+  --border: #48443f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+button, select, input { font: inherit; }
+
+header {
+  height: 64px;
+  background: #262421;
+  border-bottom: 1px solid #48443f;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  justify-content: space-between;
+}
+
+.logo {
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: white;
+}
+
+.logo span { color: var(--accent); }
+
+.header-right {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.container {
+  max-width: 1250px;
+  margin: 24px auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: minmax(280px, 700px) minmax(260px, 340px);
+  gap: 24px;
+  justify-content: center;
+}
+
+.game-area { min-width: 0; }
+
+.player-bar {
+  height: 55px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--panel);
+  border-radius: 7px;
+  margin-bottom: 9px;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 5px;
+  background: #55504a;
+  display: grid;
+  place-items: center;
+  font-size: 23px;
+}
+
+.player-name { font-weight: bold; font-size: 14px; }
+.player-sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+
+.clock {
+  background: #403c38;
+  padding: 9px 13px;
+  min-width: 85px;
+  text-align: center;
+  border-radius: 5px;
+  font-size: 23px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock.active {
+  background: var(--light);
+  color: #27241f;
+}
+
+.clock.low {
+  background: #c83d35;
+  color: white;
+}
+
+.board-wrap {
+  width: 100%;
+  aspect-ratio: 1;
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 5px 20px #17151380;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  height: 100%;
+}
+
+.square {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  aspect-ratio: 1;
+}
+
+.light { background: var(--light); }
+.dark { background: var(--green); }
+
+.square.selected {
+  background: #baca44 !important;
+}
+
+.square.last-move {
+  background-image: linear-gradient(#f5f55b70, #f5f55b70);
+}
+
+.square.check {
+  background-image: radial-gradient(
+    circle, #ff3838 10%, transparent 75%
+  );
+}
+
+.piece {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: clamp(27px, 7vw, 65px);
+  line-height: 1;
+  z-index: 2;
+  cursor: grab;
+  filter: drop-shadow(0 2px 1px #0006);
+  transition: transform .12s ease;
+}
+
+.square:active .piece { transform: scale(.92); }
+
+.white-piece {
+  color: #fff;
+  text-shadow:
+    -1px -1px 1px #333,
+    1px -1px 1px #333,
+    -1px 1px 1px #333,
+    1px 1px 2px #333;
+}
+
+.black-piece {
+  color: #252525;
+  text-shadow: 0 1px 1px #ffffff80;
+}
+
+.coord {
+  position: absolute;
+  font-size: clamp(9px, 1.4vw, 12px);
+  font-weight: bold;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.coord.rank { top: 2px; left: 3px; }
+.coord.file { bottom: 2px; right: 3px; }
+
+.light .coord { color: var(--green); }
+.dark .coord { color: var(--light); }
+
+.move-dot {
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  border-radius: 50%;
+  background: #25252555;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.capture-dot {
+  position: absolute;
+  width: 90%;
+  height: 90%;
+  border-radius: 50%;
+  border: 5px solid #25252566;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.panel {
+  background: var(--panel);
+  padding: 16px;
+  border-radius: 7px;
+}
+
+.panel-title {
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 13px;
+}
+
+.status {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+select, button {
+  border: none;
+  outline: none;
+}
+
+select {
+  background: var(--panel2);
+  color: white;
+  width: 100%;
+  padding: 11px;
+  border-radius: 5px;
+  margin-top: 7px;
+  margin-bottom: 12px;
+}
+
+.btn {
+  padding: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: .15s;
+}
+
+.btn:hover { filter: brightness(1.12); }
+
+.primary {
+  background: var(--accent);
+  color: #18200e;
+}
+
+.secondary {
+  background: #49443f;
+  color: white;
+}
+
+.danger {
+  background: #8e3935;
+  color: white;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 13px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 5px;
+  background: var(--panel2);
+  color: white;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--accent);
+  color: #17200e;
+  font-weight: bold;
+}
+
+.bot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.bot {
+  padding: 11px 7px;
+  background: var(--panel2);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  text-align: center;
+}
+
+.bot.selected {
+  border-color: var(--accent);
+  background: #414b36;
+}
+
+.bot strong { display: block; font-size: 13px; }
+.bot small { color: var(--muted); font-size: 11px; }
+
+input[type=range] {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 15px 0;
+}
+
+.rating {
+  text-align: center;
+  font-size: 25px;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.move-list {
+  height: 190px;
+  overflow-y: auto;
+  background: #302d2a;
+  border-radius: 5px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: 30px 1fr 1fr;
+  padding: 6px 5px;
+  border-bottom: 1px solid #45413c;
+}
+
+.move-row:nth-child(even) { background: #383430; }
+
+.move-number { color: var(--muted); }
+.move-current { color: var(--accent); font-weight: bold; }
+
+.small-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: #171513eF;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 15px;
+}
+
+.modal {
+  width: min(440px, 100%);
+  background: #302d29;
+  border: 1px solid #504b45;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+}
+
+.modal h2 { margin-top: 0; }
+
+.color-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0;
+}
+
+.color-choice {
+  padding: 16px 5px;
+  border-radius: 7px;
+  background: #45413c;
+  color: white;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.color-choice.selected {
+  border-color: var(--accent);
+}
+
+.color-choice .symbol {
+  font-size: 33px;
+  display: block;
+  margin-bottom: 9px;
+}
+
+.modal label {
+  display: block;
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.modal select { margin-bottom: 0; }
+
+.hidden { display: none !important; }
+
+#engineStatus {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+footer {
+  text-align: center;
+  color: #8e8982;
+  font-size: 11px;
+  padding: 20px;
+}
+
+@media(max-width: 800px) {
+  .container {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 600px;
+    gap: 12px;
+    margin: 12px auto;
+  }
+  .sidebar { grid-row: 2; }
+  .board-wrap { max-width: 600px; margin: auto; }
+  .player-bar { height: 48px; }
+  header { padding: 0 14px; }
+  .logo { font-size: 21px; }
+}
+
+@media(max-width: 380px) {
+  .panel { padding: 12px; }
+  .clock { font-size: 19px; min-width: 72px; }
+  .piece { font-size: 11vw; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">TOPI<span>CHESS</span></div>
+  <div class="header-right">♟ CHESS • THINK • WIN</div>
+</header>
+
+<main class="container">
+
+<section class="game-area">
+
+  <div class="player-bar">
+    <div class="player-info">
+      <div class="avatar" id="topAvatar">♟</div>
+      <div>
+        <div class="player-name" id="topName">Opponent</div>
+        <div class="player-sub" id="topRating">Stockfish</div>
+      </div>
+    </div>
+    <div class="clock" id="topClock">10:00</div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="player-bar" style="margin-top:9px;margin-bottom:0">
+    <div class="player-info">
+      <div class="avatar">♙</div>
+      <div>
+        <div class="player-name" id="bottomName">You</div>
+        <div class="player-sub" id="bottomRating">Player</div>
+      </div>
+    </div>
+    <div class="clock" id="bottomClock">10:00</div>
+  </div>
+
+</section>
+
+<aside class="sidebar">
+
+  <div class="panel">
+    <div class="panel-title">♟ Game Status</div>
+    <div class="status" id="gameStatus">Ready to play</div>
+    <p class="small-note" id="turnStatus">Choose your side and start a game.</p>
+    <button class="btn primary" style="width:100%;margin-top:12px"
+      onclick="showSetup()">New Game</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">⚙ Game Settings</div>
+
+    <label>Game Mode</label>
+    <select id="modeSelect" onchange="changeMode()">
+      <option value="bot">Play vs Bot</option>
+      <option value="local">Local 2 Player (Pass & Play)</option>
+    </select>
+
+    <label>Time Control</label>
+    <select id="timeSelect" onchange="changeTime()">
+      <option value="60+0">Bullet • 1 min</option>
+      <option value="120+1">Bullet • 2+1</option>
+      <option value="180+0">Blitz • 3 min</option>
+      <option value="300+0">Blitz • 5 min</option>
+      <option value="600+0" selected>Rapid • 10 min</option>
+      <option value="custom">Custom</option>
+      <option value="0+0">No Clock</option>
+    </select>
+
+    <div id="customTime" class="hidden">
+      <label>Starting minutes</label>
+      <input id="customMinutes" type="number" min="1" max="180" value="15"
+        style="width:100%;padding:9px;border-radius:5px">
+      <label>Increment in seconds</label>
+      <input id="customIncrement" type="number" min="0" max="60" value="10"
+        style="width:100%;padding:9px;border-radius:5px">
+      <button class="btn secondary" style="width:100%;margin-top:8px"
+        onclick="applyCustomTime()">Apply Custom Time</button>
+    </div>
+  </div>
+
+  <div class="panel" id="botPanel">
+    <div class="panel-title">🤖 Choose Your Opponent</div>
+
+    <div class="tabs">
+      <button class="tab active" id="presetTab"
+        onclick="switchTab('preset')">Preset Bots</button>
+      <button class="tab" id="customTab"
+        onclick="switchTab('custom')">Custom Rating</button>
+    </div>
+
+    <div id="presetBots" class="bot-grid">
+      <button class="bot selected" data-rating="600"
+        onclick="selectBot(600,this)">
+        <strong>Beginner</strong><small>600 Elo</small>
+      </button>
+      <button class="bot" data-rating="1000"
+        onclick="selectBot(1000,this)">
+        <strong>Casual</strong><small>1000 Elo</small>
+      </button>
+      <button class="bot" data-rating="1600"
+        onclick="selectBot(1600,this)">
+        <strong>Intermediate</strong><small>1600 Elo</small>
+      </button>
+      <button class="bot" data-rating="2000"
+        onclick="selectBot(2000,this)">
+        <strong>Advanced</strong><small>2000 Elo</small>
+      </button>
+      <button class="bot" data-rating="2400"
+        onclick="selectBot(2400,this)">
+        <strong>Master</strong><small>2400 Elo</small>
+      </button>
+    </div>
+
+    <div id="customBots" class="hidden">
+      <div class="rating" id="ratingDisplay">1400 Elo</div>
+      <input type="range" id="ratingSlider"
+        min="400" max="2600" step="100" value="1400"
+        oninput="updateCustomRating()">
+      <div style="display:flex;justify-content:space-between;color:#aaa;font-size:11px">
+        <span>400</span><span>1500</span><span>2600</span>
+      </div>
+    </div>
+
+    <div id="engineStatus">Engine: Not initialized</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">📜 Move History</div>
+    <div class="move-list" id="moveList">
+      <div style="color:#aaa;text-align:center;padding:20px">
+        No moves yet
+      </div>
+    </div>
+    <div class="small-note" id="moveCount">0 moves played</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">🎮 Game Controls</div>
+    <div class="controls">
+      <button class="btn secondary" onclick="undoMove()">↶ Undo</button>
+      <button class="btn secondary" onclick="flipBoard()">⇅ Flip</button>
+      <button class="btn secondary" onclick="togglePause()" id="pauseBtn">Ⅱ Pause</button>
+      <button class="btn danger" onclick="resignGame()">Resign</button>
+    </div>
+  </div>
+
+</aside>
+</main>
+
+<footer>
+  TOPICHESS © 2026 • Built for chess lovers • Powered by Stockfish
+</footer>
+
+<div class="overlay" id="setupOverlay">
+  <div class="modal">
+    <h2>♟ Welcome to TOPICHESS</h2>
+    <p style="color:#aaa;font-size:13px">Choose your side to begin your game.</p>
+
+    <div class="color-options">
+      <button class="color-choice selected" onclick="chooseColor('w',this)">
+        <span class="symbol">♔</span>White
+      </button>
+      <button class="color-choice" onclick="chooseColor('r',this)">
+        <span class="symbol">♕</span>Random
+      </button>
+      <button class="color-choice" onclick="chooseColor('b',this)">
+        <span class="symbol">♚</span>Black
+      </button>
+    </div>
+
+    <label>Game Mode</label>
+    <select id="setupMode">
+      <option value="bot">Play vs Bot</option>
+      <option value="local">Local 2 Player</option>
+    </select>
+
+    <label>Time Control</label>
+    <select id="setupTime">
+      <option value="60+0">Bullet • 1 min</option>
+      <option value="120+1">Bullet • 2+1</option>
+      <option value="180+0">Blitz • 3 min</option>
+      <option value="300+0">Blitz • 5 min</option>
+      <option value="600+0" selected>Rapid • 10 min</option>
+      <option value="0+0">No Clock</option>
+    </select>
+
+    <button class="btn primary" style="width:100%;margin-top:20px"
+      onclick="startGame()">START GAME</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="resultOverlay">
+  <div class="modal">
+    <div style="font-size:48px">🏆</div>
+    <h2 id="resultTitle">Game Over</h2>
+    <p id="resultText" style="color:#aaa"></p>
+    <button class="btn primary" style="width:100%;margin-top:15px"
+      onclick="showSetup()">Play Again</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ======================================
+// TOPICHESS GAME STATE
+// ======================================
+
+const game = new Chess();
+
+const GLYPHS = {
+  wk:"♔", wq:"♕", wr:"♖", wb:"♗", wn:"♘", wp:"♙",
+  bk:"♚", bq:"♛", br:"♜", bb:"♝", bn:"♞", bp:"♟"
+};
+
+let orientation = "w";
+let playerColor = "w";
+let selectedSquare = null;
+let legalTargets = [];
+let lastMove = null;
+let mode = "bot";
+let gameStarted = false;
+let gameOver = false;
+let paused = false;
+let botRating = 600;
+let customRating = 1400;
+let initialTime = 600;
+let increment = 0;
+let remaining = { w:600, b:600 };
+let clockInterval = null;
+let engine = null;
+let engineReady = false;
+let engineBusy = false;
+let engineFailed = false;
+let engineGeneration = 0;
+let pendingEngineSearch = false;
+let selectedColor = "w";
+
+const $ = id => document.getElementById(id);
+
+function setStatus(message) {
+  $("gameStatus").textContent = message;
+}
+
+function formatTime(seconds) {
+  seconds = Math.max(0, Math.ceil(seconds));
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return String(min).padStart(2,"0") + ":" +
+         String(sec).padStart(2,"0");
+}
+
+// ======================================
+// STOCKFISH WORKER
+// ======================================
+
+// Stockfish 10.0.2 browser WASM build.
+// Its companion WASM file is loaded from the same CDN directory.
+
+function initializeEngine() {
+  if (mode !== "bot" || engine) return;
+
+  const generation = ++engineGeneration;
+
+  try {
+    engine = new Worker(
+      "https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.wasm.js"
+    );
+
+    // Required UCI initialization messages immediately after creation.
+    engine.postMessage("uci");
+    engine.postMessage("isready");
+
+    $("engineStatus").textContent = "Engine: Connecting...";
+
+    engine.onmessage = function(event) {
+      if (generation !== engineGeneration) return;
+
+      const line = String(event.data || "").trim();
+
+      if (line === "readyok") {
+        engineReady = true;
+        engineFailed = false;
+        $("engineStatus").textContent = "Engine: Ready ✓";
+
+        if (pendingEngineSearch) {
+          pendingEngineSearch = false;
+          requestBotMove();
+        }
+      }
+
+      if (line.startsWith("bestmove")) {
+        engineBusy = false;
+
+        const match = line.match(/^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/);
+
+        if (!match || gameOver || mode !== "bot") return;
+
+        if (game.turn() !== getBotColor()) return;
+
+        const moveText = match[1];
+
+        try {
+          const move = game.move({
+            from: moveText.slice(0,2),
+            to: moveText.slice(2,4),
+            promotion: moveText[4] || "q"
+          });
+
+          if (move) {
+            lastMove = {from:move.from,to:move.to};
+            remaining[move.color] += increment;
+            afterMove();
+          }
+        } catch(e) {
+          console.error("Engine move error:",e);
+        }
+      }
+    };
+
+    engine.onerror = function(error) {
+      if (generation !== engineGeneration) return;
+      engineFailed = true;
+      engineReady = false;
+      engineBusy = false;
+      $("engineStatus").textContent = "Engine: Failed to load";
+      console.error("Stockfish loading error:",error);
+      setStatus("Engine unavailable. Check your connection.");
+    };
+
+  } catch(error) {
+    engineFailed = true;
+    $("engineStatus").textContent = "Engine: Unavailable";
+    console.error(error);
+  }
+}
+
+function getBotColor() {
+  return playerColor === "w" ? "b" : "w";
+}
+
+function ratingToSkill(rating) {
+  return Math.round((rating - 400) / 2200 * 20);
+}
+
+function ratingToDepth(rating) {
+  return Math.max(1, Math.min(14,
+    Math.round(1 + (rating - 400) / 2200 * 13)
+  ));
+}
+
+function requestBotMove() {
+  if (
+    mode !== "bot" || !gameStarted || gameOver ||
+    paused || game.turn() !== getBotColor()
+  ) return;
+
+  if (!engine) {
+    initializeEngine();
+    pendingEngineSearch = true;
+    return;
+  }
+
+  if (!engineReady) {
+    pendingEngineSearch = true;
+    return;
+  }
+
+  if (engineBusy) return;
+
+  engineBusy = true;
+
+  const skill = ratingToSkill(botRating);
+  const depth = ratingToDepth(botRating);
+
+  // Stop any previous search before sending a new one.
+  engine.postMessage("stop");
+  engine.postMessage("setoption name Skill Level value " + skill);
+  engine.postMessage("position fen " + game.fen());
+  engine.postMessage("go depth " + depth);
+}
+
+// ======================================
+// COLOR AND SETUP
+// ======================================
+
+function chooseColor(color, element) {
+  selectedColor = color;
+
+  document.querySelectorAll(".color-choice").forEach(btn =>
+    btn.classList.remove("selected")
+  );
+
+  element.classList.add("selected");
+}
+
+function showSetup() {
+  stopClock();
+  gameOver = true;
+  paused = false;
+  $("resultOverlay").classList.add("hidden");
+  $("setupOverlay").classList.remove("hidden");
+
+  $("setupMode").value = mode;
+  $("setupTime").value =
+    initialTime === 600 && increment === 0 ? "600+0" :
+    initialTime === 0 ? "0+0" :
+    initialTime + "+" + increment;
+}
+
+function startGame() {
+  mode = $("setupMode").value;
+
+  const timeValue = $("setupTime").value;
+
+  if (timeValue === "0+0") {
+    initialTime = 0;
+    increment = 0;
+  } else {
+    const parts = timeValue.split("+");
+    initialTime = Number(parts[0]);
+    increment = Number(parts[1]);
+  }
+
+  if (mode === "bot" && selectedColor === "r") {
+    playerColor = Math.random() < .5 ? "w" : "b";
+  } else {
+    playerColor = selectedColor === "r" ? "w" : selectedColor;
+  }
+
+  orientation = playerColor;
+
+  if (mode === "local") orientation = "w";
+
+  game.reset();
+  remaining = {w:initialTime,b:initialTime};
+  selectedSquare = null;
+  legalTargets = [];
+  lastMove = null;
+  gameOver = false;
+  gameStarted = true;
+  paused = false;
+  engineBusy = false;
+  pendingEngineSearch = false;
+
+  $("setupOverlay").classList.add("hidden");
+  $("resultOverlay").classList.add("hidden");
+  $("botPanel").classList.toggle("hidden",mode === "local");
+
+  $("modeSelect").value = mode;
+  $("timeSelect").value = initialTime === 0 ? "0+0" :
+    initialTime + "+" + increment;
+
+  updatePlayerNames();
+  renderBoard();
+  renderMoves();
+  updateClocks();
+  startClock();
+
+  if (mode === "bot") {
+    initializeEngine();
+
+    if (game.turn() === getBotColor()) {
+      requestBotMove();
+      setStatus("Stockfish is thinking...");
+    } else {
+      setStatus("Your turn");
+    }
+  } else {
+    setStatus("White to move");
+    $("engineStatus").textContent = "Engine: Disabled (Local mode)";
+  }
+}
+
+function updatePlayerNames() {
+  if (mode === "local") {
+    $("topName").textContent = "Black";
+    $("bottomName").textContent = "White";
+    $("topRating").textContent = "Local Player 2";
+    $("bottomRating").textContent = "Local Player 1";
+  } else if (playerColor === "w") {
+    $("bottomName").textContent = "You";
+    $("topName").textContent = "TOPICHESS Bot";
+    $("bottomRating").textContent = "White";
+    $("topRating").textContent = botRating + " Elo";
+  } else {
+    $("topName").textContent = "You";
+    $("bottomName").textContent = "TOPICHESS Bot";
+    $("topRating").textContent = "Black";
+    $("bottomRating").textContent = botRating + " Elo";
+  }
+}
+
+// ======================================
+// BOARD RENDERING
+// ======================================
+
+function renderBoard() {
+  const board = $("board");
+  board.innerHTML = "";
+
+  const files = orientation === "w"
+    ? ["a","b","c","d","e","f","g","h"]
+    : ["h","g","f","e","d","c","b","a"];
+
+  const ranks = orientation === "w"
+    ? [8,7,6,5,4,3,2,1]
+    : [1,2,3,4,5,6,7,8];
+
+  const boardState = game.board();
+
+  for (let row=0; row<8; row++) {
+    for (let col=0; col<8; col++) {
+
+      const file = files[col];
+      const rank = ranks[row];
+      const squareName = file + rank;
+
+      const square = document.createElement("div");
+
+      const isLight = (row+col)%2 === 0;
+
+      square.className = "square " +
+        (isLight ? "light" : "dark");
+
+      square.dataset.square = squareName;
+
+      if (selectedSquare === squareName)
+        square.classList.add("selected");
+
+      if (lastMove &&
+          (lastMove.from === squareName ||
+           lastMove.to === squareName))
+        square.classList.add("last-move");
+
+      const piece = boardState[rank-1][file.charCodeAt(0)-97];
+
+      if (piece) {
+        const pieceElement = document.createElement("div");
+        pieceElement.className = "piece " +
+          (piece.color === "w" ? "white-piece" : "black-piece");
+        pieceElement.textContent =
+          GLYPHS[piece.color + piece.type];
+        square.appendChild(pieceElement);
+      }
+
+      if (legalTargets.includes(squareName)) {
+        const isCapture = !!piece;
+
+        const marker = document.createElement("div");
+        marker.className = isCapture ? "capture-dot" : "move-dot";
+        square.appendChild(marker);
+      }
+
+      if (game.in_check() && piece &&
+          piece.type === "k" && piece.color === game.turn()) {
+        square.classList.add("check");
+      }
+
+      if (col === 0) {
+        const coord = document.createElement("span");
+        coord.className = "coord rank";
+        coord.textContent = rank;
+        square.appendChild(coord);
+      }
+
+      if (row === 7) {
+        const coord = document.createElement("span");
+        coord.className = "coord file";
+        coord.textContent = file;
+        square.appendChild(coord);
+      }
+
+      square.addEventListener("click", () =>
+        handleSquareClick(squareName)
+      );
+
+      board.appendChild(square);
+    }
+  }
+}
+
+// ======================================
+// MOVE INPUT AND VALIDATION
+// ======================================
+
+function handleSquareClick(square) {
+  if (!gameStarted || gameOver || paused) return;
+
+  if (mode === "bot" && game.turn() !== playerColor) return;
+
+  const piece = game.get(square);
+
+  if (selectedSquare && legalTargets.includes(square)) {
+    makePlayerMove(selectedSquare,square);
+    return;
+  }
+
+  if (piece && piece.color === game.turn()) {
+    selectedSquare = square;
+
+    legalTargets = game.moves({
+      square:square,
+      verbose:true
+    }).map(move => move.to);
+
+    renderBoard();
+    return;
+  }
+
+  selectedSquare = null;
+  legalTargets = [];
+  renderBoard();
+}
+
+function makePlayerMove(from,to) {
+  try {
+    const piece = game.get(from);
+    let promotion = "q";
+
+    if (piece && piece.type === "p" &&
+        (to.endsWith("8") || to.endsWith("1"))) {
+      const choice = prompt(
+        "Promote pawn to: q (Queen), r (Rook), b (Bishop), n (Knight)",
+        "q"
+      );
+
+      promotion = ["q","r","b","n"].includes(
+        (choice || "q").toLowerCase()
+      ) ? (choice || "q").toLowerCase() : "q";
+    }
+
+    const move = game.move({
+      from:from,
+      to:to,
+      promotion:promotion
+    });
+
+    if (!move) return;
+
+    lastMove = {from:move.from,to:move.to};
+    remaining[move.color] += increment;
+
+    selectedSquare = null;
+    legalTargets = [];
+
+    afterMove();
+
+  } catch(error) {
+    console.error("Invalid move:",error);
+  }
+}
+
+// ======================================
+// MOVE COMPLETION
+// ======================================
+
+function afterMove() {
+  selectedSquare = null;
+  legalTargets = [];
+
+  renderBoard();
+  renderMoves();
+  updateClocks();
+
+  if (game.game_over()) {
+    finishGame();
+    return;
+  }
+
+  if (mode === "bot" && game.turn() === getBotColor()) {
+    setStatus("Stockfish is thinking...");
+    $("turnStatus").textContent = "Computer is calculating its next move.";
+    requestBotMove();
+  } else if (mode === "local") {
+    setStatus(game.turn() === "w" ? "White to move" : "Black to move");
+    $("turnStatus").textContent = "Pass the device to the next player.";
+  } else {
+    setStatus("Your turn");
+    $("turnStatus").textContent = "Make your next move.";
+  }
+}
+
+function finishGame() {
+  gameOver = true;
+  stopClock();
+
+  let title = "Game Over";
+  let message = "";
+
+  if (game.in_checkmate()) {
+    const winner = game.turn() === "w" ? "Black" : "White";
+    title = winner + " Wins!";
+    message = "Checkmate! " + winner + " wins the game.";
+  } else if (game.in_stalemate()) {
+    title = "Draw!";
+    message = "The game ended in stalemate.";
+  } else if (game.in_threefold_repetition()) {
+    title = "Draw!";
+    message = "Threefold repetition.";
+  } else if (game.insufficient_material()) {
+    title = "Draw!";
+    message = "Insufficient material.";
+  } else if (game.in_draw()) {
+    title = "Draw!";
+    message = "The game ended in a draw.";
+  }
+
+  setStatus(title);
+  $("resultTitle").textContent = title;
+  $("resultText").textContent = message;
+  $("resultOverlay").classList.remove("hidden");
+}
+
+// ======================================
+// CLOCKS
+// ======================================
+
+function startClock() {
+  stopClock();
+
+  if (!initialTime || gameOver || paused) return;
+
+  clockInterval = setInterval(() => {
+    if (!gameStarted || gameOver || paused) return;
+
+    const active = game.turn();
+
+    remaining[active] -= 1;
+
+    if (remaining[active] <= 0) {
+      remaining[active] = 0;
+      updateClocks();
+      timeoutGame(active);
+      return;
+    }
+
+    updateClocks();
+  },1000);
+}
+
+function stopClock() {
+  if (clockInterval) clearInterval(clockInterval);
+  clockInterval = null;
+}
+
+function updateClocks() {
+  $("topClock").textContent = formatTime(remaining.b);
+  $("bottomClock").textContent = formatTime(remaining.w);
+
+  $("topClock").classList.toggle(
+    "active", game.turn() === "b" && gameStarted && !paused && !gameOver
+  );
+
+  $("bottomClock").classList.toggle(
+    "active", game.turn() === "w" && gameStarted && !paused && !gameOver
+  );
+
+  $("topClock").classList.toggle("low",remaining.b <= 10 && remaining.b > 0);
+  $("bottomClock").classList.toggle("low",remaining.w <= 10 && remaining.w > 0);
+}
+
+function timeoutGame(color) {
+  gameOver = true;
+  stopClock();
+
+  const winner = color === "w" ? "Black" : "White";
+
+  setStatus(winner + " wins on time!");
+
+  $("resultTitle").textContent = winner + " Wins!";
+  $("resultText").textContent = "Victory by timeout.";
+  $("resultOverlay").classList.remove("hidden");
+}
+
+// ======================================
+// MOVE HISTORY
+// ======================================
+
+function renderMoves() {
+  const moves = game.history();
+  const list = $("moveList");
+
+  list.innerHTML = "";
+
+  if (moves.length === 0) {
+    list.innerHTML =
+      '<div style="color:#aaa;text-align:center;padding:20px">No moves yet</div>';
+    $("moveCount").textContent = "0 moves played";
+    return;
+  }
+
+  for (let i=0;i<moves.length;i+=2) {
+    const row = document.createElement("div");
+    row.className = "move-row";
+
+    const number = document.createElement("span");
+    number.className = "move-number";
+    number.textContent = (Math.floor(i/2)+1) + ".";
+
+    const white = document.createElement("span");
+    white.textContent = moves[i];
+
+    const black = document.createElement("span");
+    black.textContent = moves[i+1] || "";
+
+    row.append(number,white,black);
+    list.appendChild(row);
+  }
+
+  list.scrollTop = list.scrollHeight;
+  $("moveCount").textContent = moves.length + " half-moves played";
+}
+
+// ======================================
+// BOT SELECTION
+// ======================================
+
+function switchTab(tab) {
+  $("presetTab").classList.toggle("active",tab==="preset");
+  $("customTab").classList.toggle("active",tab==="custom");
+
+  $("presetBots").classList.toggle("hidden",tab!=="preset");
+  $("customBots").classList.toggle("hidden",tab!=="custom");
+}
+
+function selectBot(rating,element) {
+  botRating = rating;
+
+  document.querySelectorAll(".bot").forEach(btn =>
+    btn.classList.remove("selected")
+  );
+
+  element.classList.add("selected");
+  updatePlayerNames();
+}
+
+function updateCustomRating() {
+  customRating = Number($("ratingSlider").value);
+  botRating = customRating;
+  $("ratingDisplay").textContent = customRating + " Elo";
+  updatePlayerNames();
+}
+
+// ======================================
+// MODE AND TIME SETTINGS
+// ======================================
+
+function changeMode() {
+  mode = $("modeSelect").value;
+
+  $("botPanel").classList.toggle("hidden",mode==="local");
+
+  if (mode === "local") {
+    if (engine) {
+      engine.postMessage("stop");
+      engine.terminate();
+      engine = null;
+    }
+
+    engineGeneration++;
+    engineReady = false;
+    engineBusy = false;
+    pendingEngineSearch = false;
+
+    $("engineStatus").textContent = "Engine: Disabled (Local mode)";
+    orientation = "w";
+    playerColor = "w";
+    updatePlayerNames();
+    renderBoard();
+  } else {
+    if (gameStarted && !gameOver) {
+      initializeEngine();
+      if (game.turn() === getBotColor()) requestBotMove();
+    }
+  }
+}
+
+function changeTime() {
+  const value = $("timeSelect").value;
+
+  $("customTime").classList.toggle("hidden",value!=="custom");
+
+  if (value === "custom") return;
+
+  const parts = value.split("+");
+  initialTime = Number(parts[0]);
+  increment = Number(parts[1]);
+
+  if (!gameStarted || gameOver) {
+    remaining = {w:initialTime,b:initialTime};
+    updateClocks();
+  } else {
+    setStatus("Time control changed. Start a new game to apply it.");
+  }
+}
+
+function applyCustomTime() {
+  const minutes = Math.max(1,Math.min(180,
+    Number($("customMinutes").value) || 15
+  ));
+
+  const seconds = Math.max(0,Math.min(60,
+    Number($("customIncrement").value) || 0
+  ));
+
+  initialTime = minutes * 60;
+  increment = seconds;
+
+  remaining = {w:initialTime,b:initialTime};
+
+  updateClocks();
+
+  $("timeSelect").value = "custom";
+  setStatus("Custom time applied. Start a new game.");
+}
+
+// ======================================
+// GAME CONTROLS
+// ======================================
+
+function undoMove() {
+  if (!gameStarted || gameOver) return;
+
+  if (mode === "bot" && engineBusy && engine) {
+    engine.postMessage("stop");
+    engineBusy = false;
+  }
+
+  game.undo();
+
+  if (mode === "bot" && game.history().length > 0) {
+    game.undo();
+  }
+
+  remaining = {
+    w:Math.max(0,remaining.w-increment),
+    b:Math.max(0,remaining.b-increment)
+  };
+
+  const history = game.history({verbose:true});
+  lastMove = history.length
+    ? {
+        from:history[history.length-1].from,
+        to:history[history.length-1].to
+      }
+    : null;
+
+  gameOver = false;
+  selectedSquare = null;
+  legalTargets = [];
+  pendingEngineSearch = false;
+
+  renderBoard();
+  renderMoves();
+  updateClocks();
+
+  if (mode === "bot" && game.turn() === getBotColor()) {
+    requestBotMove();
+  }
+
+  setStatus("Move undone");
+}
+
+function flipBoard() {
+  orientation = orientation === "w" ? "b" : "w";
+  renderBoard();
+}
+
+function togglePause() {
+  if (!gameStarted || gameOver) return;
+
+  paused = !paused;
+
+  $("pauseBtn").textContent = paused ? "▶ Resume" : "Ⅱ Pause";
+
+  if (paused) {
+    stopClock();
+
+    if (engine && engineBusy) {
+      engine.postMessage("stop");
+      engineBusy = false;
+      pendingEngineSearch = true;
+    }
+
+    setStatus("Game paused");
+  } else {
+    startClock();
+    setStatus("Game resumed");
+
+    if (mode === "bot" && game.turn() === getBotColor()) {
+      requestBotMove();
+    }
+  }
+
+  updateClocks();
+}
+
+function resignGame() {
+  if (!gameStarted || gameOver) return;
+
+  const confirmed = confirm("Are you sure you want to resign?");
+  if (!confirmed) return;
+
+  gameOver = true;
+  stopClock();
+
+  const winner = game.turn() === "w" ? "Black" : "White";
+
+  $("resultTitle").textContent = winner + " Wins!";
+  $("resultText").textContent = "Victory by resignation.";
+  $("resultOverlay").classList.remove("hidden");
+
+  setStatus("Game resigned");
+}
+
+// ======================================
+// INITIALIZATION
+// ======================================
+
+function init() {
+  renderBoard();
+  renderMoves();
+  updateClocks();
+  setStatus("Ready to play");
+
+  // Setup modal is shown on page load.
+}
+
+init();
+
+</script>
+</body>
+</html>
