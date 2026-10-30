@@ -1,0 +1,544 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TOPICHESS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;background:#101820;color:white;overscroll-behavior:none}
+body{overflow:hidden;touch-action:pan-y}
+button,select,input{font-size:15px;border:0;border-radius:8px;padding:11px 14px;cursor:pointer}
+button{background:#263746;color:white}
+button:active{opacity:.7}
+.primary{background:#16a36a;color:white}
+#setup{height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+.setup-card{background:#1c2a36;padding:25px;border-radius:16px;width:min(420px,100%);text-align:center}
+.setup-card h1{color:#20c985;font-size:32px;margin-top:0}
+.setup-card button{margin:5px}
+select{background:#263746;color:white;width:100%;margin:8px 0}
+.rating-box{background:#263746;padding:15px;border-radius:10px;margin:12px 0}
+.rating-number{font-size:30px;color:#20c985;font-weight:bold}
+input[type=range]{width:100%;accent-color:#20c985;padding:0;margin:15px 0}
+.rating-label{color:#b8c9d3;font-size:13px}
+#game{display:none;height:100dvh;overflow:hidden}
+header{height:54px;background:#17232e;display:flex;align-items:center;justify-content:space-between;padding:0 12px}
+header strong{color:#20c985;font-size:21px}
+#main{height:calc(100dvh - 54px);display:flex;gap:14px;padding:12px;overflow:hidden;justify-content:center}
+#board-area{width:min(72vh,72vw,650px);max-width:650px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;gap:8px}
+.player{background:#1c2a36;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.clock{font-size:20px;font-weight:bold;font-variant-numeric:tabular-nums}
+.clock.active{color:#20c985}
+#board{width:100%;aspect-ratio:1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden;border:3px solid #263746;border-radius:3px}
+.square{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:1;font-size:clamp(25px,7.5vw,62px);line-height:1;cursor:pointer;touch-action:none}
+.light{background:#eeeed2;color:#111}
+.dark{background:#769656;color:#111}
+.square.selected{background:#f6f669!important}
+.square.last{box-shadow:inset 0 0 0 4px #e5c84b}
+.square.legal:after{content:"";position:absolute;width:25%;height:25%;border-radius:50%;background:#263b45;opacity:.45}
+.square.capture:after{content:"";position:absolute;width:85%;height:85%;border:5px solid #263b45;border-radius:50%;opacity:.45}
+.piece{pointer-events:none;text-shadow:0 1px 2px #777}
+.white-piece{color:#fff;text-shadow:0 1px 2px #111,1px 1px 2px #111,-1px -1px 2px #111}
+.black-piece{color:#111;text-shadow:0 1px 1px #fff}
+#side{width:300px;max-width:38%;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
+.panel{background:#1c2a36;padding:12px;border-radius:10px}
+.panel h3{margin:0 0 10px;color:#20c985;font-size:16px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.controls button{padding:10px 5px}
+#status{font-weight:bold;min-height:22px}
+#history{max-height:180px;overflow:auto;font-size:14px;line-height:1.8}
+.history-row{display:grid;grid-template-columns:30px 1fr 1fr;gap:5px}
+#captured{font-size:23px;min-height:30px;word-break:break-all}
+.small{font-size:12px;color:#b6c4cf}
+.hidden{display:none!important}
+@media(max-width:700px){
+ #main{flex-direction:column;align-items:center;gap:8px;padding:8px;overflow-y:auto}
+ #board-area{width:min(94vw,54vh);max-width:none;flex-shrink:0}
+ #side{width:min(94vw,600px);max-width:none;display:grid;grid-template-columns:1fr 1fr;overflow:visible}
+ #side .wide{grid-column:1/-1}
+ #game{overflow-y:auto}
+ #main{height:auto;min-height:calc(100dvh - 54px)}
+}
+</style>
+</head>
+<body>
+
+<section id="setup">
+ <div class="setup-card">
+  <h1>♟ TOPICHESS</h1>
+  <p>Choose your game mode</p>
+  <select id="mode">
+   <option value="bot">Play vs Computer</option>
+   <option value="local">Two Players</option>
+  </select>
+
+  <div id="bot-options">
+   <p>Custom Bot Rating</p>
+   <div class="rating-box">
+    <div class="rating-number"><span id="rating-display">800</span> Elo</div>
+    <input type="range" id="rating" min="400" max="2500" step="50" value="800">
+    <div class="rating-label" id="rating-label">Beginner</div>
+    <div class="rating-label">400 — 2500</div>
+   </div>
+   <p>Choose your color</p>
+   <button class="primary" onclick="startGame('w')">White</button>
+   <button onclick="startGame('b')">Black</button>
+   <button onclick="startGame('random')">Random</button>
+  </div>
+
+  <div id="local-options" class="hidden">
+   <button class="primary" onclick="startGame('w')">Start Local Game</button>
+  </div>
+ </div>
+</section>
+
+<section id="game">
+ <header>
+  <strong>♟ TOPICHESS</strong>
+  <button onclick="backToSetup()">Menu</button>
+ </header>
+ <main id="main">
+  <div id="board-area">
+   <div class="player">
+    <span id="top-name">Black</span>
+    <span class="clock" id="black-clock">03:00</span>
+   </div>
+   <div id="board"></div>
+   <div class="player">
+    <span id="bottom-name">White</span>
+    <span class="clock" id="white-clock">03:00</span>
+   </div>
+  </div>
+
+  <aside id="side">
+   <div class="panel wide">
+    <h3>Game status</h3>
+    <div id="status">Your turn</div>
+    <div class="small" id="bot-rating-info"></div>
+   </div>
+   <div class="panel">
+    <h3>Captured by White</h3>
+    <div id="white-captured">—</div>
+   </div>
+   <div class="panel">
+    <h3>Captured by Black</h3>
+    <div id="black-captured">—</div>
+   </div>
+   <div class="panel wide">
+    <h3>Game controls</h3>
+    <div class="controls">
+     <button class="primary" onclick="newGame()">New Game</button>
+     <button onclick="undoMove()">Undo</button>
+     <button onclick="flipBoard()">Flip Board</button>
+     <button onclick="backToSetup()">Change Mode</button>
+    </div>
+   </div>
+   <div class="panel wide">
+    <h3>Move history</h3>
+    <div id="history">No moves yet</div>
+   </div>
+   <div class="panel wide">
+    <h3>Time control</h3>
+    <select id="time-control" onchange="changeTime()">
+     <option value="180">3 minutes</option>
+     <option value="300">5 minutes</option>
+     <option value="600">10 minutes</option>
+     <option value="900">15 minutes</option>
+    </select>
+   </div>
+  </aside>
+ </main>
+</section>
+
+<script>
+if(typeof Chess==="undefined"){
+ document.body.innerHTML="<h2 style='padding:20px'>TOPICHESS could not load chess.js. Check your internet connection and reload.</h2>";
+ throw new Error("Chess library failed to load");
+}
+
+const game=new Chess();
+const boardEl=document.getElementById("board");
+const symbols={
+ wk:"♔",wq:"♕",wr:"♖",wb:"♗",wn:"♘",wp:"♙",
+ bk:"♚",bq:"♛",br:"♜",bb:"♝",bn:"♞",bp:"♟"
+};
+
+let humanColor="w",botColor="b",mode="bot";
+let botRating=800;
+let selected=null,legalMoves=[],flipped=false,lastMove=null;
+let botThinking=false,botTimer=null;
+let baseTime=180,remaining={w:180000,b:180000};
+let activeClock=null,lastClock=Date.now(),clockTimer=null;
+let capturedWhite=[],capturedBlack=[];
+
+const ratingInput=document.getElementById("rating");
+
+function ratingName(r){
+ if(r<600)return "Very Easy";
+ if(r<800)return "Easy";
+ if(r<1000)return "Beginner";
+ if(r<1200)return "Casual";
+ if(r<1400)return "Intermediate";
+ if(r<1600)return "Strong";
+ if(r<1800)return "Very Strong";
+ if(r<2000)return "Advanced";
+ if(r<2200)return "Expert";
+ return "Master level";
+}
+
+function updateRatingDisplay(){
+ const r=Number(ratingInput.value);
+ document.getElementById("rating-display").textContent=r;
+ document.getElementById("rating-label").textContent=ratingName(r);
+}
+ratingInput.addEventListener("input",updateRatingDisplay);
+
+function startGame(color){
+ mode=document.getElementById("mode").value;
+ botRating=Number(ratingInput.value);
+ humanColor=color==="random"?(Math.random()<.5?"w":"b"):color;
+ if(mode==="local")humanColor="w";
+ botColor=humanColor==="w"?"b":"w";
+
+ document.getElementById("setup").style.display="none";
+ document.getElementById("game").style.display="block";
+ document.getElementById("bot-rating-info").textContent=
+  mode==="bot"?"Computer rating: "+botRating+" Elo ("+ratingName(botRating)+")":"Local two-player game";
+
+ baseTime=Number(document.getElementById("time-control").value);
+ resetGame();
+}
+
+function resetGame(){
+ clearTimeout(botTimer);
+ clearInterval(clockTimer);
+ game.reset();
+ selected=null;legalMoves=[];lastMove=null;botThinking=false;
+ flipped=mode==="bot"&&humanColor==="b";
+ capturedWhite=[];capturedBlack=[];
+ remaining={w:baseTime*1000,b:baseTime*1000};
+ activeClock="w";lastClock=Date.now();
+
+ document.getElementById("top-name").textContent=flipped?"White":"Black";
+ document.getElementById("bottom-name").textContent=flipped?"Black":"White";
+
+ render();
+ updateAll();
+ startClock();
+
+ if(mode==="bot"&&botColor==="w")scheduleBot();
+}
+
+function render(){
+ boardEl.innerHTML="";
+ const files=flipped?["h","g","f","e","d","c","b","a"]:["a","b","c","d","e","f","g","h"];
+ const ranks=flipped?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1];
+
+ for(let r of ranks){
+  for(let f of files){
+   const sq=f+r;
+   const fileIndex="abcdefgh".indexOf(f);
+   const rankIndex=Number(r);
+   const cell=document.createElement("div");
+   cell.className="square "+((fileIndex+rankIndex)%2===0?"light":"dark");
+   cell.dataset.square=sq;
+
+   if(selected===sq)cell.classList.add("selected");
+   if(lastMove&&(lastMove.from===sq||lastMove.to===sq))cell.classList.add("last");
+
+   const moves=legalMoves.filter(m=>m.to===sq);
+   if(moves.length)cell.classList.add(game.get(sq)?"capture":"legal");
+
+   const piece=game.get(sq);
+   if(piece){
+    const span=document.createElement("span");
+    span.className="piece "+(piece.color==="w"?"white-piece":"black-piece");
+    span.textContent=symbols[piece.color+piece.type];
+    cell.appendChild(span);
+   }
+
+   cell.addEventListener("click",()=>tapSquare(sq));
+   boardEl.appendChild(cell);
+  }
+ }
+}
+
+function tapSquare(sq){
+ if(game.game_over()||botThinking)return;
+ if(mode==="bot"&&game.turn()!==humanColor)return;
+
+ const piece=game.get(sq);
+
+ if(selected){
+  const matching=legalMoves.filter(m=>m.to===sq);
+  if(matching.length){
+   const promotion=matching.find(m=>m.promotion==="q")?"q":undefined;
+   makeMove(selected,sq,promotion);
+   return;
+  }
+ }
+
+ if(piece&&piece.color===game.turn()){
+  selected=sq;
+  legalMoves=game.moves({square:sq,verbose:true});
+  render();
+  return;
+ }
+
+ selected=null;
+ legalMoves=[];
+ render();
+}
+
+function makeMove(from,to,promotion){
+ const move=game.move({from,to,promotion:promotion||"q"});
+ if(!move)return;
+
+ lastMove={from:move.from,to:move.to};
+
+ if(move.captured){
+  const capturedSymbol=symbols[(move.color==="w"?"b":"w")+move.captured];
+  if(move.color==="w")capturedWhite.push(capturedSymbol);
+  else capturedBlack.push(capturedSymbol);
+ }
+
+ selected=null;
+ legalMoves=[];
+ switchClock();
+ render();
+ updateAll();
+
+ if(!game.game_over()&&mode==="bot"&&game.turn()===botColor){
+  scheduleBot();
+ }
+}
+
+function scheduleBot(){
+ if(game.game_over()||mode!=="bot")return;
+ botThinking=true;
+ document.getElementById("status").textContent="Computer is thinking...";
+ botTimer=setTimeout(()=>{
+  const move=chooseBotMove();
+  botThinking=false;
+  if(move)makeMove(move.from,move.to,move.promotion);
+  else updateStatus();
+ },300);
+}
+
+function chooseBotMove(){
+ const moves=game.moves({verbose:true});
+ if(!moves.length)return null;
+
+ // Lower ratings make more random mistakes.
+ const mistakeChance=Math.max(0.02,Math.min(0.75,(1800-botRating)/2200));
+
+ if(Math.random()<mistakeChance){
+  return moves[Math.floor(Math.random()*moves.length)];
+ }
+
+ // Search depth increases with rating, with a mobile-friendly limit.
+ let depth=1;
+ if(botRating>=1000)depth=2;
+ if(botRating>=1600)depth=3;
+
+ let scored=[];
+ for(const m of moves){
+  game.move(m);
+  const score=-search(depth-1,-Infinity,Infinity);
+  game.undo();
+  scored.push({move:m,score:score});
+ }
+
+ scored.sort((a,b)=>b.score-a.score);
+
+ // Sometimes choose a slightly weaker move at lower ratings.
+ const poolSize=botRating<800?Math.min(5,scored.length):
+                botRating<1200?Math.min(3,scored.length):1;
+
+ const pool=scored.slice(0,poolSize);
+ return pool[Math.floor(Math.random()*pool.length)].move;
+}
+
+function search(depth,alpha,beta){
+ if(depth===0||game.game_over())return evaluate();
+
+ const moves=game.moves({verbose:true});
+ let best=-Infinity;
+
+ for(const m of moves){
+  game.move(m);
+  const score=-search(depth-1,-beta,-alpha);
+  game.undo();
+
+  best=Math.max(best,score);
+  alpha=Math.max(alpha,score);
+  if(alpha>=beta)break;
+ }
+ return best;
+}
+
+function evaluate(){
+ if(game.in_checkmate())return -100000;
+ if(game.in_draw())return 0;
+
+ const values={p:100,n:320,b:330,r:500,q:900,k:20000};
+ let score=0;
+ const b=game.board();
+
+ for(let row of b){
+  for(let p of row){
+   if(p){
+    score+=(p.color===game.turn()?1:-1)*values[p.type];
+   }
+  }
+ }
+ return score;
+}
+
+function updateAll(){
+ updateStatus();
+ updateHistory();
+ updateCaptured();
+ updateClocks();
+}
+
+function updateStatus(){
+ const el=document.getElementById("status");
+ if(game.in_checkmate()){
+  el.textContent="Checkmate! "+(game.turn()==="w"?"Black":"White")+" wins!";
+ }else if(game.in_draw()){
+  el.textContent="Draw game";
+ }else if(game.in_check()){
+  el.textContent="Check! "+(game.turn()==="w"?"White":"Black")+" to move";
+ }else if(mode==="bot"&&game.turn()===botColor){
+  el.textContent="Computer's turn";
+ }else{
+  el.textContent=(game.turn()==="w"?"White":"Black")+"'s turn";
+ }
+}
+
+function updateHistory(){
+ const hist=game.history();
+ if(!hist.length){
+  document.getElementById("history").textContent="No moves yet";
+  return;
+ }
+
+ let html="";
+ for(let i=0;i<hist.length;i+=2){
+  html+='<div class="history-row"><b>'+(i/2+1)+'.</b><span>'+hist[i]+'</span><span>'+(hist[i+1]||"")+'</span></div>';
+ }
+ document.getElementById("history").innerHTML=html;
+ document.getElementById("history").scrollTop=99999;
+}
+
+function updateCaptured(){
+ document.getElementById("white-captured").textContent=capturedWhite.join(" ")||"—";
+ document.getElementById("black-captured").textContent=capturedBlack.join(" ")||"—";
+}
+
+function formatTime(ms){
+ const s=Math.max(0,Math.ceil(ms/1000));
+ return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+}
+
+function updateClocks(){
+ document.getElementById("white-clock").textContent=formatTime(remaining.w);
+ document.getElementById("black-clock").textContent=formatTime(remaining.b);
+ document.getElementById("white-clock").classList.toggle("active",activeClock==="w");
+ document.getElementById("black-clock").classList.toggle("active",activeClock==="b");
+}
+
+function startClock(){
+ clearInterval(clockTimer);
+ lastClock=Date.now();
+
+ clockTimer=setInterval(()=>{
+  if(!activeClock||game.game_over())return;
+
+  const now=Date.now();
+  remaining[activeClock]-=now-lastClock;
+  lastClock=now;
+
+  if(remaining[activeClock]<=0){
+   remaining[activeClock]=0;
+   clearInterval(clockTimer);
+   activeClock=null;
+   document.getElementById("status").textContent=
+    (game.turn()==="w"?"White":"Black")+" ran out of time!";
+  }
+  updateClocks();
+ },200);
+}
+
+function switchClock(){
+ const now=Date.now();
+
+ if(activeClock)remaining[activeClock]-=now-lastClock;
+ activeClock=game.turn();
+ lastClock=now;
+
+ if(remaining[activeClock]<=0){
+  remaining[activeClock]=0;
+  activeClock=null;
+ }
+ updateClocks();
+}
+
+function changeTime(){
+ baseTime=Number(document.getElementById("time-control").value);
+ resetGame();
+}
+
+function newGame(){
+ resetGame();
+}
+
+function undoMove(){
+ clearTimeout(botTimer);
+ botThinking=false;
+
+ if(game.history().length){
+  game.undo();
+
+  if(mode==="bot"&&game.history().length&&game.turn()!==humanColor){
+   game.undo();
+  }
+
+  lastMove=null;
+  selected=null;
+  legalMoves=[];
+  remaining={w:baseTime*1000,b:baseTime*1000};
+  activeClock=game.turn();
+  lastClock=Date.now();
+
+  render();
+  updateAll();
+
+  if(mode==="bot"&&game.turn()===botColor)scheduleBot();
+ }
+}
+
+function flipBoard(){
+ flipped=!flipped;
+ render();
+}
+
+function backToSetup(){
+ clearInterval(clockTimer);
+ clearTimeout(botTimer);
+ document.getElementById("game").style.display="none";
+ document.getElementById("setup").style.display="flex";
+}
+
+document.getElementById("mode").addEventListener("change",e=>{
+ document.getElementById("bot-options").classList.toggle("hidden",e.target.value!=="bot");
+ document.getElementById("local-options").classList.toggle("hidden",e.target.value!=="local");
+});
+
+updateRatingDisplay();
+</script>
+</body>
+</html>
