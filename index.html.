@@ -230,142 +230,7 @@ const PIECE_VALUES = {p:100,n:320,b:330,r:500,q:900,k:20000};
 const BLACK_PIECES = {p:"♟",n:"♞",b:"♝",r:"♜",q:"♛"};
 const WHITE_PIECES = {p:"♙",n:"♘",b:"♗",r:"♖",q:"♕"};
 
-
-/* =========================================
-   BOARD: TAP TO SELECT, TAP TO MOVE
-========================================= */
-
-let selectedSquare = null;
-let legalTargets = [];
-
-function clearSelection() {
- selectedSquare = null;
- legalTargets = [];
-
- document.querySelectorAll("#board .square-55d63").forEach(square => {
-  square.classList.remove(
-   "selected-square",
-   "legal-target",
-   "legal-capture"
-  );
- });
-}
-
-function showSelection(square) {
- clearSelection();
-
- selectedSquare = square;
- legalTargets = game.moves({
-  square: square,
-  verbose: true
- });
-
- const selected = document.querySelector("#board .square-" + square);
- if (selected) selected.classList.add("selected-square");
-
- legalTargets.forEach(move => {
-  const target = document.querySelector("#board .square-" + move.to);
-
-  if (target) {
-   target.classList.add(
-    move.captured ? "legal-capture" : "legal-target"
-   );
-  }
- });
-}
-
-function handleSquareTap(square) {
- if (game.game_over() || timedOut || botThinking) return;
-
- if (gameMode === "bot" && game.turn() === botColor) return;
-
- const piece = game.get(square);
-
- if (selectedSquare) {
-  if (square === selectedSquare) {
-   clearSelection();
-   return;
-  }
-
-  const legalMove = legalTargets.find(move => move.to === square);
-
-  if (legalMove) {
-   if (selectedTime > 0) {
-    tickClock();
-    if (timedOut) return;
-   }
-
-   const move = game.move({
-    from: selectedSquare,
-    to: square,
-    promotion: "q"
-   });
-
-   clearSelection();
-
-   if (move) {
-    board.position(game.fen());
-    switchClock();
-    updateEverything();
-
-    if (gameMode === "bot" && !game.game_over()) {
-     scheduleBotTurn();
-    }
-   }
-
-   return;
-  }
-
-  if (
-   piece &&
-   piece.color === game.turn() &&
-   (gameMode !== "bot" || piece.color === humanColor)
-  ) {
-   showSelection(square);
-   return;
-  }
-
-  clearSelection();
-  return;
- }
-
- if (
-  piece &&
-  piece.color === game.turn() &&
-  (gameMode !== "bot" || piece.color === humanColor)
- ) {
-  showSelection(square);
- }
-}
-
-board = Chessboard("board", {
- draggable: false,
- position: "start",
- orientation: "white",
- pieceTheme: "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
-});
-
-$("#board").on("click", ".square-55d63", function () {
- const match = this.className.match(/square-([a-h][1-8])/);
-
- if (match) {
-  handleSquareTap(match[1]);
- }
-});
-
-window.addEventListener("resize", function () {
- if (board) board.resize();
-});
-
-/* Prevent scrolling while touching the board */
-document.getElementById("board").addEventListener(
- "touchmove",
- function(event) {
-  event.preventDefault();
- },
- { passive: false }
-);
-
+/* BOARD AND TAP CONTROLS */
 
 function clearSelection(){
  selectedSquare = null;
@@ -453,6 +318,26 @@ function handleSquareTap(square){
   showSelection(square);
  }
 }
+
+board = Chessboard("board",{
+ draggable:false,
+ position:"start",
+ orientation:"white",
+ pieceTheme:"https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
+});
+
+$("#board").on("click", ".square-55d63", function(){
+ const match = this.className.match(/square-([a-h][1-8])/);
+ if(match) handleSquareTap(match[1]);
+});
+
+window.addEventListener("resize",()=>{if(board) board.resize();});
+
+/* Prevent page scrolling only while touching the chessboard */
+const boardElement = document.getElementById("board");
+boardElement.addEventListener("touchmove",function(e){
+ e.preventDefault();
+},{passive:false});
 
 /* COLOR SELECTION */
 
